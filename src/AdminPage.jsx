@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { onSyncMessage, postCmd, postSnapshotReq } from './game/sync'
-import { ABILITIES, BALANCE_NOTE, CHAOS_EVENTS, DEFAULT_SETTINGS, giftIcon } from './game/engine'
+import { ABILITIES, BALANCE_NOTE, CHAOS_EVENTS, DEFAULT_SETTINGS, giftIcon, giftPrice, giftTier } from './game/engine'
 import { fetchLeaderboard, supabaseConfigured } from './game/supabase'
 
 const TABS = [
@@ -150,7 +150,7 @@ export default function AdminPage() {
       {tab === 'gifts' && (
         <section className="pml-admin-sec">
           <h2>🎁 Quà tặng → Chiêu</h2>
-          <p className="pml-admin-note">Tên quà khán giả tặng sẽ kích hoạt chiêu tương ứng. Chạm vào một món quà để mở bảng chi tiết của nó — giống bảng chọn quà trên TikTok. Quà nào không có trong bảng sẽ bị bỏ qua (không tự đoán).</p>
+          <p className="pml-admin-note">Quà thật trên TikTok, chỉ lấy quà dưới 100 xu — xu càng cao chiêu càng mạnh (1 xu = thử thách nhỏ như trượt vỏ chuối, 99 xu = thử thách cực mạnh). Chạm vào một món quà để mở bảng chi tiết của nó — giống bảng chọn quà trên TikTok. Quà nào không có trong bảng sẽ bị bỏ qua (không tự đoán).</p>
           <GiftMapEditor giftMap={settings.giftMap || {}} onSave={(giftMap) => updateSettings({ giftMap })} onTest={(gift) => { postCmd({ cmd: 'simGift', giftName: gift, nickname: 'Bạn Thử', userId: 'test', text: '' }); flash('Đã gửi thử quà lên màn hiển thị.') }} />
           <h3>⏱ Thời gian mỗi chiêu (giây)</h3>
           <div className="pml-admin-grid">
@@ -316,10 +316,12 @@ function GiftMapEditor({ giftMap, onSave, onTest }) {
       <div className="pml-gift-grid">
         {entries.map(([gift, ability]) => {
           const a = ABILITIES.find((x) => x.id === ability)
+          const price = giftPrice(gift)
           return (
             <button key={gift} className={`pml-gift-tile ${sel === gift ? 'active' : ''}`} onClick={() => setSelected(sel === gift ? null : gift)}>
               <span className="gi">{giftIcon(gift)}</span>
               <span className="gn">{gift}</span>
+              {price != null && <span className="gp">🪙 {price} xu</span>}
               <span className="ga">{a ? `${a.icon} ${a.name}` : ''}</span>
             </button>
           )
@@ -332,6 +334,7 @@ function GiftMapEditor({ giftMap, onSave, onTest }) {
             <div>
               <div className="gs-name">{sel}</div>
               <div className="gs-ability">{selAbility.icon} {selAbility.name}</div>
+              {giftPrice(sel) != null && <div className="gs-price">🪙 {giftPrice(sel)} xu — {giftTier(giftPrice(sel))}</div>}
             </div>
             <button className="gs-x" onClick={() => setSelected(null)}>✕</button>
           </div>

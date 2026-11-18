@@ -32,18 +32,36 @@ export const ABILITIES = [
 ]
 export const ABILITY_BY_ID = Object.fromEntries(ABILITIES.map((a) => [a.id, a]))
 
-// Quà mặc định → chiêu (streamer sửa được trong Admin, lưu localStorage).
+// Quà mặc định → chiêu, theo đúng dữ liệu quà TikTok (tên + giá xu lấy từ
+// bảng quà TikTok, chỉ lấy quà dưới 100 xu). Xu càng cao chiêu càng mạnh:
+// 1 xu = thử thách nhỏ (trượt vỏ chuối), 5 xu = vừa, 10–20 xu = lớn,
+// 99 xu = cực mạnh. Tên ngắn để cuối bảng để khớp chuỗi con không nhận nhầm.
 export const DEFAULT_GIFT_MAP = {
+  // 1 xu → trượt vỏ chuối (thử thách nhỏ)
   'hoa hồng': 'banana', rose: 'banana',
-  'kem': 'ice', 'ice cream': 'ice',
-  'dưa hấu': 'melon', watermelon: 'melon',
-  'găng tay': 'glove', boxing: 'glove',
-  'lưới': 'net',
-  'bom': 'dizzy',
-  'tên lửa': 'rocket', rocket: 'rocket',
-  'khiên': 'shield', shield: 'shield',
-  'thuốc': 'heal', potion: 'heal',
-  'nam châm': 'magnet', magnet: 'magnet',
+  'kem ốc quế': 'banana', 'ice cream': 'banana',
+  'nhịp trống mirwas': 'banana', mirwas: 'banana',
+  'nhạc tự do': 'banana',
+  'nhạc xưa': 'banana',
+  'thả tim cho tôi': 'banana',
+  'tiktok': 'banana',
+  'đỉnh': 'banana',
+  // 5 xu → trượt băng (thử thách vừa)
+  'bing chilling': 'ice',
+  'quả đào': 'ice', peach: 'ice',
+  'phản ứng quá lố': 'ice',
+  'trái bóng xoáy': 'ice',
+  'bắn tim': 'ice', 'finger heart': 'ice',
+  // 10 xu → đấm bay / dính lưới (thử thách lớn)
+  'rosa': 'glove',
+  'cỏ bốn lá': 'net', 'four-leaf clover': 'net', clover: 'net',
+  // 20 xu → lăn dưa hấu / hồi phục (thử thách lớn)
+  'nước hoa': 'melon', perfume: 'melon',
+  'little kisses': 'heal',
+  // 99 xu → bom chóng mặt (thử thách cực mạnh)
+  'hạc giấy': 'dizzy', 'paper crane': 'dizzy',
+  'gg': 'banana',
+  'ok': 'ice',
 }
 
 // ─── Icon khớp với quà trên TikTok ──────────────────────────────────────────
@@ -70,10 +88,53 @@ export const GIFT_ICONS = {
   'kẹo': '🍬', candy: '🍬',
   'trà sữa': '🧋', 'cà phê': '☕', coffee: '☕',
   'mèo': '🐱', 'gấu': '🧸',
+  'kem ốc quế': '🍦', 'ice cream': '🍦', 'bing chilling': '🍦',
+  'quả đào': '🍑', peach: '🍑',
+  'hạc giấy': '🕊️', 'paper crane': '🕊️',
+  'nhịp trống mirwas': '🥁', mirwas: '🥁',
+  'ok': '👌',
+  'phản ứng quá lố': '🤪',
+  'trái bóng xoáy': '⚽',
+  'bắn tim': '🫰', 'finger heart': '🫰',
+  'nhạc tự do': '🎵', 'nhạc xưa': '📻',
+  'thả tim cho tôi': '❤️',
+  'gg': '🎮',
+  'tiktok': '🎵',
+  'đỉnh': '🐱',
+  'rosa': '🌹',
+  'cỏ bốn lá': '🍀', 'four-leaf clover': '🍀', clover: '🍀',
+  'nước hoa': '🧴', perfume: '🧴',
+  'little kisses': '💋',
 }
 export function giftIcon(giftName) {
   if (!giftName) return '🎁'
   return GIFT_ICONS[GiftEngine.normGiftName(giftName)] || '🎁'
+}
+
+// Giá xu thật của quà TikTok (theo bảng quà TikTok), chỉ quà dưới 100 xu.
+export const GIFT_PRICES = {
+  'hoa hồng': 1, rose: 1,
+  'kem ốc quế': 1, 'ice cream': 1,
+  'nhịp trống mirwas': 1, mirwas: 1,
+  'nhạc tự do': 1, 'nhạc xưa': 1, 'thả tim cho tôi': 1, 'gg': 1, 'tiktok': 1, 'đỉnh': 1,
+  'bing chilling': 5, 'quả đào': 5, peach: 5, 'ok': 5,
+  'phản ứng quá lố': 5, 'trái bóng xoáy': 5, 'bắn tim': 5, 'finger heart': 5,
+  'rosa': 10, 'cỏ bốn lá': 10, 'four-leaf clover': 10, clover: 10,
+  'nước hoa': 20, perfume: 20, 'little kisses': 20,
+  'hạc giấy': 99, 'paper crane': 99,
+}
+export function giftPrice(giftName) {
+  if (!giftName) return null
+  const p = GIFT_PRICES[GiftEngine.normGiftName(giftName)]
+  return p == null ? null : p
+}
+// Xu càng cao thử thách càng lớn (theo giá quà TikTok).
+export function giftTier(coins) {
+  if (coins == null) return ''
+  if (coins <= 1) return 'Thử thách nhỏ'
+  if (coins <= 5) return 'Thử thách vừa'
+  if (coins <= 20) return 'Thử thách lớn'
+  return 'Thử thách cực mạnh'
 }
 
 // ─── Sự kiện hỗn loạn ───────────────────────────────────────────────────────

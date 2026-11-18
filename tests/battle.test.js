@@ -5,7 +5,7 @@ import assert from 'node:assert'
 import {
   ABILITIES, BOT_NAMES, CHAOS_EVENTS, DEFAULT_SETTINGS, GiftEngine, PET_TYPES, advance,
   applyAbility, applyChaosEvent, clearNegatives, createRace, currentSpeedMult, fillBots,
-  joinRacer, makeRacer, parseTarget, pickChaosEvent, startRace, tick, uniqueBotName,
+  giftPrice, giftTier, joinRacer, makeRacer, parseTarget, pickChaosEvent, startRace, tick, uniqueBotName,
 } from '../src/game/engine.js'
 
 let pass = 0, fail = 0
@@ -112,8 +112,10 @@ test('giới hạn toàn cục xếp hàng các chiêu đến dồn dập', () =
   const s = freshRace()
   const eng = new GiftEngine(s)
   eng.receive({ id: 'e1', giftName: 'Hoa hồng', nickname: 'A', userId: 'a' })
-  eng.receive({ id: 'e2', giftName: 'Tên lửa', nickname: 'B', userId: 'b' })
-  eng.receive({ id: 'e3', giftName: 'Khiên', nickname: 'C', userId: 'c' })
+  // Món thứ 2 phải là buff (heal) để không bị miễn nhiễm chặn — test này chỉ
+  // kiểm tra hàng đợi + giới hạn 1,5 giây, không kiểm tra miễn nhiễm.
+  eng.receive({ id: 'e2', giftName: 'little kisses', nickname: 'B', userId: 'b' })
+  eng.receive({ id: 'e3', giftName: 'Hạc giấy', nickname: 'C', userId: 'c' })
   assert.equal(eng.queueLength, 3)
   const first = eng.process(10)
   assert.equal(first.ok, true)
@@ -145,13 +147,27 @@ test('map quà theo tên đã cấu hình, quà lạ bị bỏ qua', () => {
   const eng = new GiftEngine(s)
   assert.equal(eng.resolveGift('Hoa Hồng'), 'banana')
   assert.equal(eng.resolveGift('HOA HỒNG'), 'banana')
-  assert.equal(eng.resolveGift('Kem'), 'ice')
-  assert.equal(eng.resolveGift('Tên lửa'), 'rocket')
+  assert.equal(eng.resolveGift('Kem'), 'banana') // Kem ốc quế 1 xu = trượt chuối
+  assert.equal(eng.resolveGift('Hạc giấy'), 'dizzy') // 99 xu = thử thách cực mạnh
+  assert.equal(eng.resolveGift('Rosa'), 'glove') // 10 xu = đấm bay
+  assert.equal(eng.resolveGift('Cỏ bốn lá'), 'net') // 10 xu = dính lưới
+  assert.equal(eng.resolveGift('little kisses'), 'heal') // 20 xu = hồi phục
   assert.equal(eng.resolveGift('Quà lạ hoắc'), null)
   const unmapped = eng.receive({ id: 'u1', giftName: 'Quà lạ hoắc', nickname: 'A', userId: 'a' })
   assert.equal(unmapped.ok, false)
   assert.equal(unmapped.reason, 'unmapped')
   assert.equal(eng.queueLength, 0)
+})
+
+test('giá xu quà TikTok + bậc thử thách theo xu', () => {
+  assert.equal(giftPrice('Hoa hồng'), 1)
+  assert.equal(giftPrice('Rosa'), 10)
+  assert.equal(giftPrice('Hạc giấy'), 99)
+  assert.equal(giftPrice('Quà lạ hoắc'), null)
+  assert.equal(giftTier(1), 'Thử thách nhỏ')
+  assert.equal(giftTier(5), 'Thử thách vừa')
+  assert.equal(giftTier(20), 'Thử thách lớn')
+  assert.equal(giftTier(99), 'Thử thách cực mạnh')
 })
 
 test('không chọn mục tiêu → đánh đối thủ ngẫu nhiên, không đánh thú của mình', () => {

@@ -218,6 +218,7 @@ input, select { font-family: inherit; }
 }
 .pml-gift-tile .gi { font-size: 34px; line-height: 1.1; }
 .pml-gift-tile .gn { font-size: 13px; font-weight: 700; text-align: center; line-height: 1.25; }
+.pml-gift-tile .gp { font-size: 12px; font-weight: 800; color: #b45309; }
 .pml-gift-tile .ga { font-size: 12px; opacity: .75; }
 .pml-gift-tile.active { border-color: #14532d; background: #dcfce7; }
 .pml-gift-sheet { background: #fff; border: 2px solid #14532d; border-radius: 18px; padding: 14px; margin: 12px 0; display: flex; flex-direction: column; gap: 10px; }
@@ -225,6 +226,7 @@ input, select { font-family: inherit; }
 .pml-gift-sheet .gs-icon { font-size: 52px; line-height: 1; }
 .pml-gift-sheet .gs-name { font-size: 17px; font-weight: 800; }
 .pml-gift-sheet .gs-ability { font-size: 13.5px; opacity: .8; margin-top: 2px; }
+.pml-gift-sheet .gs-price { font-size: 13.5px; font-weight: 800; color: #b45309; margin-top: 2px; }
 .pml-gift-sheet .gs-x { margin-left: auto; border: none; background: none; font-size: 18px; color: #64748b; padding: 4px 8px; }
 .pml-gift-sheet .gs-desc { background: #fef9c3; border-radius: 10px; padding: 10px 12px; font-size: 13.5px; margin: 0; }
 .pml-admin-addrow input, .pml-admin-addrow select {

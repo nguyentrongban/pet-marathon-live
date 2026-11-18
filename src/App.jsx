@@ -116,7 +116,7 @@ function DisplayGame() {
               <div className="pml-rules-title">🐾 PET MARATHON LIVE</div>
               <div className="pml-rules-tiles">
                 <div className="pml-rules-tile pink"><span>💬</span><b>Bình luận THAM GIA</b><br />để nhận 1 thú đua</div>
-                <div className="pml-rules-tile yellow"><span>🎁</span><b>Tặng quà</b><br />ném chuối, dưa hấu, tên lửa…</div>
+                <div className="pml-rules-tile yellow"><span>🎁</span><b>Tặng quà</b><br />Hoa hồng 1 xu trượt chuối 🍌, quà càng nhiều xu chiêu càng mạnh</div>
                 <div className="pml-rules-tile blue"><span>🛡️</span><b>Khiên &amp; thuốc</b><br />chặn đòn, hồi phục</div>
                 <div className="pml-rules-tile green"><span>❤️</span><b>Thả tim</b><br />đủ 100 tim tăng tốc</div>
               </div>
@@ -151,9 +151,8 @@ function DisplayGame() {
             <button className="pml-guide-x" onClick={() => setGuideOpen(false)} aria-label="Đóng hướng dẫn">✕</button>
             <h3>📖 CÁCH CHƠI</h3>
             <p>💬 Bình luận <b>THAM GIA</b> — nhận 1 thú đua (tối đa 6)</p>
-            <p>🎁 Tặng quà — ném chuối 🍌, dưa hấu 🍉, lưới 🕸️, găng tay 🥊, băng 🧊, bom chóng mặt 💫</p>
-            <p>🚀 Tên lửa, 🛡️ khiên, 🧪 thuốc, 🧲 nam châm — tăng sức cho thú của bạn</p>
-            <p>🎯 Kèm <b>@tên</b> hoặc <b>số làn 1-6</b> để chọn mục tiêu, không kèm thì chọn ngẫu nhiên</p>
+            <p>🎁 Tặng quà — Hoa hồng 1 xu trượt chuối 🍌 · Kem 5 xu trượt băng 🧊 · Hạc giấy 99 xu chóng mặt 💫 · quà càng nhiều xu chiêu càng mạnh</p>
+            <p>💋 Little Kisses 20 xu hồi phục cho thú của bạn · 🎯 Kèm <b>@tên</b> hoặc <b>số làn 1-6</b> để chọn mục tiêu, không kèm thì chọn ngẫu nhiên</p>
             <p>❤️ Đủ 100 tim — 1 thú ngẫu nhiên tăng tốc</p>
             <p>🛡️ Bị đánh xong được miễn nhiễm 3 giây, mỗi thú chỉ bị đánh tối đa 3 lần / cuộc đua</p>
           </div>
