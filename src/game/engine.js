@@ -585,6 +585,14 @@ export function finishRace(state) {
   pushFeed(state, 'finish', `🏆 Hết cuộc đua! Vô địch: ${ordered[0]?.nickname || '—'} (${ordered[0]?.petName || ''})`)
 }
 
+// Mỗi màn phải tham gia lại: khi bắt đầu màn mới sau khi màn trước đã xong,
+// xóa hết thú cũ. Người đăng ký chờ trong lúc đua (pending) vẫn được giữ
+// lại sau bước này; người bình luận trong lúc chờ/đếm ngược thì vào thẳng.
+// Màn đầu (waiting) thì không xóa — người vào trước khi bắt đầu vẫn được giữ.
+export function clearRacersForNewRound(state) {
+  if (state.phase === 'finished') state.racers.splice(0)
+}
+
 export function startRace(state) {
   if (state.racers.length < 2) fillBots(state)
   for (const r of state.racers) {

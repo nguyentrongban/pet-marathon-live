@@ -5,7 +5,8 @@ import assert from 'node:assert'
 import { createSeqTracker, parseCommand } from '../src/game/adapter.js'
 import {
   ABILITIES, BOT_NAMES, CHAOS_EVENTS, DEFAULT_SETTINGS, GiftEngine, PET_TYPES, advance,
-  applyAbility, applyChaosEvent, clearNegatives, createRace, currentSpeedMult, fillBots,
+  applyAbility, applyChaosEvent, clearNegatives, clearRacersForNewRound, createRace, currentSpeedMult, fillBots,
+  finishRace,
   giftPrice, giftTier, joinRacer, makeRacer, parseTarget, pickChaosEvent, startRace, tick, uniqueBotName,
 } from '../src/game/engine.js'
 
@@ -196,6 +197,22 @@ test('bộ nhớ seq: event trùng chỉ tính 1 lần (bắt kịp sau rớt m�
   // Quá giới hạn 3: seq cũ nhất (1) bị quên, nhận lại thì tính là mới.
   assert.equal(t.seen(1), false)
   assert.equal(t.seen(4), true)
+})
+
+test('mỗi màn phải tham gia lại: màn mới xóa hết thú cũ', () => {
+  const s = freshRace()
+  assert.equal(s.racers.length, 3)
+  finishRace(s)
+  assert.equal(s.phase, 'finished')
+  clearRacersForNewRound(s)
+  assert.equal(s.racers.length, 0, 'màn trước đã xong thì phải xóa hết thú')
+  // Bảng kết quả màn trước vẫn còn (không bị xóa theo).
+  assert.equal(s.results.length, 3)
+  // Màn đầu (waiting) thì không xóa — người vào trước khi bắt đầu vẫn được giữ.
+  const s2 = createRace({ ...DEFAULT_SETTINGS, durations: { ...DEFAULT_SETTINGS.durations } })
+  joinRacer(s2, 'Minh', 'minh')
+  clearRacersForNewRound(s2)
+  assert.equal(s2.racers.length, 1)
 })
 
 test('không chọn mục tiêu → đánh đối thủ ngẫu nhiên, không đánh thú của mình', () => {

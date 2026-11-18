@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ABILITY_BY_ID, DEFAULT_SETTINGS, GiftEngine, advance, applyAbility, applyChaosEvent,
+  clearRacersForNewRound,
   createRace, fillBots, finishRace, giftIcon, joinRacer, parseTarget, startRace,
 } from './engine'
 import { createSeqTracker, normalizeEvent, parseCommand } from './adapter'
@@ -246,6 +247,11 @@ export function usePetMarathon() {
   // ── Bắt đầu cuộc đua (áp dụng người chờ + lấp bot) ──
   const doStart = useCallback(() => {
     const s = stateRef.current
+    // Mỗi màn phải tham gia lại: màn trước đã xong thì xóa hết thú cũ.
+    if (s.phase === 'finished') {
+      clearRacersForNewRound(s)
+      s.feed.push({ id: `f${Date.now()}`, kind: 'info', text: '🏁 Màn mới! Bình luận THAM GIA để vào đua!', at: s.now })
+    }
     for (const p of pendingJoinsRef.current.splice(0)) {
       joinRacer(s, p.nickname, p.userId)
     }
