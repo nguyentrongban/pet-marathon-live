@@ -1,0 +1,233 @@
+/* ─── PET MARATHON LIVE · index.css ─────────────────────────────────────────
+   Giao diện điện thoại trước (9:16), tiếng Việt, nút to, chữ rõ. */
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #0b3d2e; color: #fff;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font-family: inherit; cursor: pointer; }
+input, select { font-family: inherit; }
+
+/* ── Màn hiển thị ── */
+.pml-app { height: 100%; }
+.pml-stage {
+  position: relative; width: 100%; height: 100dvh; max-width: 560px; margin: 0 auto;
+  overflow: hidden; background: #87ceeb;
+}
+.pml-scene { position: absolute; inset: 0; }
+.pml-scene canvas { display: block; width: 100% !important; height: 100% !important; }
+
+.pml-topbar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+  background: linear-gradient(rgba(0,0,0,.45), transparent);
+}
+.pml-logo { font-weight: 800; font-size: 17px; letter-spacing: .5px; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.pml-logo b { color: #ffd60a; }
+.pml-live { color: #ff5a5a; font-size: 12px; animation: pml-blink 1.2s infinite; }
+@keyframes pml-blink { 50% { opacity: .35; } }
+.pml-top-actions { display: flex; gap: 8px; align-items: center; }
+.pml-dot { width: 11px; height: 11px; border-radius: 50%; background: #888; border: 2px solid rgba(255,255,255,.6); }
+.pml-dot.on { background: #34c759; box-shadow: 0 0 8px #34c759; }
+.pml-iconbtn, .pml-helpbtn {
+  border: none; border-radius: 999px; background: rgba(0,0,0,.45); color: #fff;
+  padding: 7px 11px; font-size: 14px;
+}
+.pml-helpbtn { font-weight: 700; }
+
+.pml-standings {
+  position: absolute; top: calc(52px + env(safe-area-inset-top)); left: 10px; right: 10px; z-index: 4;
+  display: flex; flex-direction: column; gap: 4px; pointer-events: none;
+}
+.pml-row {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(0,0,0,.42); border-radius: 999px; padding: 4px 10px 4px 6px;
+  font-size: 12.5px; backdrop-filter: blur(2px);
+}
+.pml-row.lead { background: rgba(255, 214, 10, .28); outline: 1.5px solid rgba(255,214,10,.7); }
+.pml-row-rank { font-weight: 800; width: 14px; text-align: center; }
+.pml-row-pet { font-size: 15px; }
+.pml-row-name { font-weight: 700; max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pml-row-bar { flex: 1; height: 7px; background: rgba(255,255,255,.25); border-radius: 99px; overflow: hidden; }
+.pml-row-bar i { display: block; height: 100%; background: #ffd60a; border-radius: 99px; transition: width .3s linear; }
+.pml-row-pct { font-size: 11px; opacity: .9; width: 30px; text-align: right; }
+.pml-row-st { font-size: 13px; }
+
+.pml-floaters { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+.pml-floater {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  font-size: 21px; font-weight: 900; color: #fff; text-shadow: 0 2px 0 #d97706, 0 3px 10px rgba(0,0,0,.6);
+  animation: pml-float-up 2.2s ease-out forwards; white-space: nowrap;
+}
+@keyframes pml-float-up {
+  0% { opacity: 0; transform: translate(-50%, 14px) scale(.7); }
+  15% { opacity: 1; transform: translate(-50%, 0) scale(1.12); }
+  30% { transform: translate(-50%, -4px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -46px) scale(1); }
+}
+
+.pml-bigbanner {
+  position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); z-index: 7;
+  text-align: center; pointer-events: none; width: 92%;
+  animation: pml-banner 5s ease-out forwards;
+}
+.pml-bigbanner .bb-text {
+  font-size: 34px; font-weight: 900; color: #ffd60a;
+  text-shadow: 0 3px 0 #b45309, 0 6px 18px rgba(0,0,0,.65); letter-spacing: 1px;
+}
+.pml-bigbanner .bb-sub { font-size: 16px; font-weight: 700; text-shadow: 0 2px 8px rgba(0,0,0,.7); margin-top: 4px; }
+@keyframes pml-banner {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.6); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  20% { transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+.pml-countdown {
+  position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); z-index: 8;
+  font-size: 96px; font-weight: 900; color: #fff;
+  text-shadow: 0 4px 0 #166534, 0 8px 24px rgba(0,0,0,.6);
+  animation: pml-count-pop .9s ease-out infinite; pointer-events: none;
+}
+@keyframes pml-count-pop { 0% { transform: translate(-50%,-50%) scale(1.5); opacity: 0; } 25% { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
+
+.pml-overlay {
+  position: absolute; inset: 0; z-index: 9; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center;
+  background: rgba(0,0,0,.45); padding: 20px;
+}
+.pml-overlay h1 { margin: 6px 0; font-size: 30px; }
+.pml-overlay p { margin: 4px 0; font-size: 15px; opacity: .95; }
+.pml-overlay .big-emoji { font-size: 64px; }
+.pml-rules-card {
+  background: rgba(255,255,255,.96); color: #14532d; border-radius: 22px;
+  padding: 20px 16px; width: 100%; max-width: 420px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+}
+.pml-rules-title { font-size: 24px; font-weight: 900; margin-bottom: 12px; }
+.pml-rules-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pml-rules-tile { border-radius: 14px; padding: 10px 8px; font-size: 13px; line-height: 1.35; }
+.pml-rules-tile span { font-size: 24px; display: block; }
+.pml-rules-tile.pink { background: #ffe4ec; }
+.pml-rules-tile.yellow { background: #fff3bf; }
+.pml-rules-tile.blue { background: #dbeafe; }
+.pml-rules-tile.green { background: #dcfce7; }
+.pml-rules-join { margin-top: 12px; font-weight: 800; font-size: 15px; color: #b45309; }
+.pml-overlay-hint { margin-top: 8px; font-size: 13px; opacity: .75; }
+
+.pml-podium-card {
+  background: rgba(255,255,255,.96); color: #14532d; border-radius: 22px;
+  padding: 20px 16px; width: 100%; max-width: 420px; box-shadow: 0 12px 40px rgba(0,0,0,.4);
+}
+.pml-podium-title { font-size: 21px; font-weight: 900; margin-bottom: 10px; }
+.pml-podium-row { display: flex; align-items: center; gap: 8px; padding: 9px 6px; font-size: 15px; border-bottom: 1px solid #e5e7eb; }
+.pml-podium-row:last-of-type { border-bottom: none; }
+.pml-podium-row.place1 { font-weight: 900; font-size: 17px; }
+.pp-medal { font-size: 22px; }
+.pp-pet { font-size: 20px; }
+.pp-name { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-petname { opacity: .6; font-size: 13px; }
+.pml-podium-foot { margin-top: 10px; font-size: 13px; opacity: .7; }
+
+.pml-guide {
+  position: absolute; top: 60px; right: 10px; z-index: 10; width: min(86vw, 320px);
+  background: rgba(255,255,255,.97); color: #14532d; border-radius: 16px; padding: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.4); font-size: 13.5px; line-height: 1.45;
+}
+.pml-guide h3 { margin: 0 0 8px; }
+.pml-guide p { margin: 6px 0; }
+.pml-guide-x { position: absolute; top: 8px; right: 8px; border: none; background: none; font-size: 16px; }
+
+.pml-feed {
+  position: absolute; left: 10px; right: 10px; bottom: calc(52px + env(safe-area-inset-bottom)); z-index: 5;
+  display: flex; flex-direction: column; gap: 3px; pointer-events: none;
+}
+.pml-feed-line {
+  background: rgba(0,0,0,.5); border-radius: 999px; padding: 5px 11px;
+  font-size: 13px; width: fit-content; max-width: 100%;
+  animation: pml-feed-in .25s ease-out;
+}
+@keyframes pml-feed-in { from { opacity: 0; transform: translateY(6px); } }
+.pml-feed-line.chaos { background: rgba(180, 83, 9, .85); font-weight: 800; }
+.pml-feed-line.finish { background: rgba(20, 83, 45, .85); font-weight: 700; }
+
+.pml-bottombar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
+  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+  padding: 9px 10px calc(9px + env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, rgba(0,0,0,.55));
+  font-size: 13px; font-weight: 700;
+}
+
+/* ── Admin ── */
+.pml-admin { min-height: 100dvh; background: #f1f5f9; color: #0f172a; padding: 0 0 40px; overflow-y: auto; }
+.pml-admin-head {
+  background: #14532d; color: #fff; padding: 16px; display: flex;
+  flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center;
+}
+.pml-admin-head h1 { margin: 0; font-size: 19px; }
+.pml-admin-head h1 span { font-size: 13px; font-weight: 400; opacity: .85; }
+.pml-admin-status { font-size: 13px; display: flex; gap: 6px; align-items: center; }
+.pml-admin-notice {
+  margin: 12px 16px 0; background: #dcfce7; color: #14532d; border-radius: 10px;
+  padding: 10px 12px; font-weight: 700; font-size: 14px;
+}
+.pml-admin-tabs { display: flex; gap: 6px; padding: 12px 16px 0; flex-wrap: wrap; }
+.pml-admin-tabs button {
+  border: 1px solid #cbd5e1; background: #fff; border-radius: 999px;
+  padding: 9px 14px; font-size: 14px; font-weight: 700; color: #0f172a;
+}
+.pml-admin-tabs button.active { background: #14532d; color: #fff; border-color: #14532d; }
+.pml-admin-sec { padding: 8px 16px; max-width: 760px; }
+.pml-admin-sec h2 { font-size: 19px; margin: 14px 0 6px; }
+.pml-admin-sec h3 { font-size: 16px; margin: 18px 0 6px; }
+.pml-admin-sec h4 { font-size: 14px; margin: 14px 0 6px; }
+.pml-admin-sec p { font-size: 14px; line-height: 1.5; }
+.pml-admin-note { background: #fef9c3; border-radius: 10px; padding: 10px 12px; font-size: 13.5px; }
+.pml-admin-btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.pml-admin-btns button, .pml-admin-addrow button {
+  border: none; background: #14532d; color: #fff; border-radius: 10px;
+  padding: 10px 14px; font-size: 14px; font-weight: 700;
+}
+.pml-admin-btns button:disabled { opacity: .45; cursor: default; }
+.pml-admin-list { font-size: 14px; line-height: 1.7; padding-left: 20px; }
+.pml-admin-list.mono { font-family: ui-monospace, monospace; font-size: 12.5px; list-style: none; padding-left: 0; }
+.pml-admin-list .dim { opacity: .55; }
+.pml-admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.pml-admin-field { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; font-weight: 600; }
+.pml-admin-field input, .pml-admin-field select {
+  padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 9px; font-size: 14px; background: #fff; color: #0f172a;
+}
+.pml-admin-check { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 12px 0; }
+.pml-admin-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.pml-admin-table th, .pml-admin-table td { padding: 6px; text-align: left; }
+.pml-admin-table input, .pml-admin-table select {
+  width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: #fff; color: #0f172a;
+}
+.pml-admin-table button { border: none; background: none; font-size: 16px; color: #dc2626; }
+.pml-admin-addrow { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+.pml-admin-addrow input, .pml-admin-addrow select {
+  padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 9px; font-size: 14px; background: #fff; color: #0f172a;
+}
+.pml-admin-link { border: none; background: none; color: #14532d; font-weight: 700; font-size: 13.5px; padding: 6px 0; text-decoration: underline; }
+.pml-admin-abilities { display: flex; flex-wrap: wrap; gap: 8px; }
+.pml-admin-abilities button {
+  border: 2px solid #cbd5e1; background: #fff; border-radius: 12px;
+  padding: 9px 12px; font-size: 13.5px; font-weight: 700; color: #0f172a;
+}
+.pml-admin-abilities button.active { border-color: #14532d; background: #dcfce7; }
+.pml-admin-targets { display: flex; flex-direction: column; gap: 6px; font-size: 14px; margin: 8px 0; }
+.pml-admin-targets label { display: flex; gap: 7px; align-items: center; }
+.pml-admin-diag {
+  background: #0f172a; color: #a7f3d0; border-radius: 10px; padding: 12px;
+  font-size: 12px; overflow-x: auto; white-space: pre-wrap;
+}
+@media (max-width: 420px) {
+  .pml-bigbanner .bb-text { font-size: 27px; }
+  .pml-countdown { font-size: 76px; }
+  .pml-row-name { max-width: 26%; }
+}
