@@ -46,6 +46,36 @@ export const DEFAULT_GIFT_MAP = {
   'nam châm': 'magnet', magnet: 'magnet',
 }
 
+// ─── Icon khớp với quà trên TikTok ──────────────────────────────────────────
+// Hiện trong bảng chọn quà ở Admin (chạm vào 1 món quà để xem chi tiết kiểu
+// bảng chọn quà TikTok) và trong nhật ký quà ở tab Kết nối. Quà nào chưa có
+// trong bảng này thì hiện 🎁.
+export const GIFT_ICONS = {
+  'hoa hồng': '🌹', rose: '🌹', hoa: '🌸',
+  'kem': '🍦', 'ice cream': '🍦',
+  'dưa hấu': '🍉', watermelon: '🍉',
+  'găng tay': '🥊', boxing: '🥊', găng: '🥊',
+  'lưới': '🕸️',
+  'bom': '💣',
+  'tên lửa': '🚀', rocket: '🚀',
+  'khiên': '🛡️', shield: '🛡️',
+  'thuốc': '🧪', potion: '🧪',
+  'nam châm': '🧲', magnet: '🧲',
+  'bánh': '🎂', cake: '🎂', 'bánh kem': '🎂',
+  'bóng bay': '🎈', balloon: '🎈',
+  'tim': '❤️', heart: '❤️',
+  'ngôi sao': '⭐', star: '⭐',
+  'vương miện': '👑', crown: '👑',
+  'xe hơi': '🚗', car: '🚗',
+  'kẹo': '🍬', candy: '🍬',
+  'trà sữa': '🧋', 'cà phê': '☕', coffee: '☕',
+  'mèo': '🐱', 'gấu': '🧸',
+}
+export function giftIcon(giftName) {
+  if (!giftName) return '🎁'
+  return GIFT_ICONS[GiftEngine.normGiftName(giftName)] || '🎁'
+}
+
 // ─── Sự kiện hỗn loạn ───────────────────────────────────────────────────────
 export const CHAOS_EVENTS = [
   { id: 'banana_rain', name: 'Mưa Chuối',        icon: '🍌', desc: 'Vỏ chuối rơi khắp đường đua!' },

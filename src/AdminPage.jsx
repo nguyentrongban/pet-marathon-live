@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { onSyncMessage, postCmd, postSnapshotReq } from './game/sync'
-import { ABILITIES, BALANCE_NOTE, CHAOS_EVENTS, DEFAULT_SETTINGS } from './game/engine'
+import { ABILITIES, BALANCE_NOTE, CHAOS_EVENTS, DEFAULT_SETTINGS, giftIcon } from './game/engine'
 import { fetchLeaderboard, supabaseConfigured } from './game/supabase'
 
 const TABS = [
@@ -150,8 +150,8 @@ export default function AdminPage() {
       {tab === 'gifts' && (
         <section className="pml-admin-sec">
           <h2>🎁 Quà tặng → Chiêu</h2>
-          <p className="pml-admin-note">Tên quà khán giả tặng sẽ kích hoạt chiêu tương ứng. Sửa tên quà cho khớp với quà trên live của bạn. Quà nào không có trong bảng sẽ bị bỏ qua (không tự đoán).</p>
-          <GiftMapEditor giftMap={settings.giftMap || {}} onSave={(giftMap) => updateSettings({ giftMap })} />
+          <p className="pml-admin-note">Tên quà khán giả tặng sẽ kích hoạt chiêu tương ứng. Chạm vào một món quà để mở bảng chi tiết của nó — giống bảng chọn quà trên TikTok. Quà nào không có trong bảng sẽ bị bỏ qua (không tự đoán).</p>
+          <GiftMapEditor giftMap={settings.giftMap || {}} onSave={(giftMap) => updateSettings({ giftMap })} onTest={(gift) => { postCmd({ cmd: 'simGift', giftName: gift, nickname: 'Bạn Thử', userId: 'test', text: '' }); flash('Đã gửi thử quà lên màn hiển thị.') }} />
           <h3>⏱ Thời gian mỗi chiêu (giây)</h3>
           <div className="pml-admin-grid">
             {ABILITIES.filter((a) => a.duration > 0).map((a) => (
@@ -275,43 +275,90 @@ export default function AdminPage() {
   )
 }
 
-// ─── Bảng sửa map quà ───
-function GiftMapEditor({ giftMap, onSave }) {
-  const [rows, setRows] = useState(() => Object.entries(giftMap).map(([gift, ability]) => ({ gift, ability })))
+// ─── Bảng chọn quà kiểu TikTok ───
+// Lưới quà: mỗi món hiện đúng icon quà TikTok + tên + chiêu. Chạm vào 1 món
+// quà sẽ mở bảng chi tiết của món đó (icon lớn, tên, chiêu, thử tặng, xóa).
+function GiftMapEditor({ giftMap, onSave, onTest }) {
+  const [selected, setSelected] = useState(null)
   const [newGift, setNewGift] = useState('')
   const [newAbility, setNewAbility] = useState('banana')
+  const entries = Object.entries(giftMap)
+  const sel = selected != null && giftMap[selected] ? selected : null
+  const selAbility = sel ? ABILITIES.find((a) => a.id === giftMap[sel]) : null
 
-  const save = (next) => { setRows(next); onSave(Object.fromEntries(next.map((r) => [r.gift.trim().toLowerCase(), r.ability]))) }
+  const rename = (oldName, newName) => {
+    const name = String(newName || '').trim().toLowerCase()
+    if (!name || name === oldName) return
+    const next = { ...giftMap }
+    const ability = next[oldName]
+    delete next[oldName]
+    next[name] = ability
+    onSave(next)
+    setSelected(name)
+  }
+  const setAbility = (gift, ability) => onSave({ ...giftMap, [gift]: ability })
+  const removeGift = (gift) => {
+    const next = { ...giftMap }
+    delete next[gift]
+    onSave(next)
+    setSelected(null)
+  }
+  const addGift = () => {
+    const name = newGift.trim().toLowerCase()
+    if (!name) return
+    onSave({ ...giftMap, [name]: newAbility })
+    setNewGift('')
+    setSelected(name)
+  }
+
   return (
     <div>
-      <table className="pml-admin-table">
-        <thead><tr><th>Tên quà</th><th>Chiêu</th><th /></tr></thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i}>
-              <td><input value={r.gift} onChange={(e) => { const next = [...rows]; next[i] = { ...r, gift: e.target.value }; setRows(next) }} onBlur={() => save(rows)} /></td>
-              <td>
-                <select value={r.ability} onChange={(e) => { const next = [...rows]; next[i] = { ...r, ability: e.target.value }; save(next) }}>
-                  {ABILITIES.map((a) => <option key={a.id} value={a.id}>{a.icon} {a.name}</option>)}
-                </select>
-              </td>
-              <td><button onClick={() => save(rows.filter((_, j) => j !== i))}>✕</button></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="pml-gift-grid">
+        {entries.map(([gift, ability]) => {
+          const a = ABILITIES.find((x) => x.id === ability)
+          return (
+            <button key={gift} className={`pml-gift-tile ${sel === gift ? 'active' : ''}`} onClick={() => setSelected(sel === gift ? null : gift)}>
+              <span className="gi">{giftIcon(gift)}</span>
+              <span className="gn">{gift}</span>
+              <span className="ga">{a ? `${a.icon} ${a.name}` : ''}</span>
+            </button>
+          )
+        })}
+      </div>
+      {sel && selAbility && (
+        <div className="pml-gift-sheet">
+          <div className="gs-top">
+            <span className="gs-icon">{giftIcon(sel)}</span>
+            <div>
+              <div className="gs-name">{sel}</div>
+              <div className="gs-ability">{selAbility.icon} {selAbility.name}</div>
+            </div>
+            <button className="gs-x" onClick={() => setSelected(null)}>✕</button>
+          </div>
+          <p className="gs-desc">{selAbility.desc}</p>
+          <label className="pml-admin-field">Tên quà
+            <input key={sel} defaultValue={sel} onBlur={(e) => rename(sel, e.target.value)} />
+          </label>
+          <label className="pml-admin-field">Chiêu khi tặng quà này
+            <select value={giftMap[sel]} onChange={(e) => setAbility(sel, e.target.value)}>
+              {ABILITIES.map((a) => <option key={a.id} value={a.id}>{a.icon} {a.name}</option>)}
+            </select>
+          </label>
+          <div className="pml-admin-btns">
+            <button onClick={() => onTest(sel)}>🎁 Thử tặng quà này</button>
+            <button onClick={() => removeGift(sel)}>✕ Xóa quà này</button>
+          </div>
+        </div>
+      )}
       <div className="pml-admin-addrow">
-        <input value={newGift} onChange={(e) => setNewGift(e.target.value)} placeholder="Tên quà mới, vd: Bóng bay" />
+        <span style={{ fontSize: 26, alignSelf: 'center' }}>{giftIcon(newGift)}</span>
+        <input value={newGift} onChange={(e) => setNewGift(e.target.value)} placeholder="Tên quà mới, vd: Bánh" />
         <select value={newAbility} onChange={(e) => setNewAbility(e.target.value)}>
           {ABILITIES.map((a) => <option key={a.id} value={a.id}>{a.icon} {a.name}</option>)}
         </select>
-        <button onClick={() => {
-          if (!newGift.trim()) return
-          save([...rows, { gift: newGift.trim(), ability: newAbility }])
-          setNewGift('')
-        }}>➕ Thêm</button>
+        <button onClick={addGift}>➕ Thêm</button>
       </div>
-      <button className="pml-admin-link" onClick={() => save(Object.entries(DEFAULT_SETTINGS.giftMap).map(([gift, ability]) => ({ gift, ability })))}>
+      <button className="pml-admin-link" onClick={() => { onSave({ ...DEFAULT_SETTINGS.giftMap }); setSelected(null) }}>
         ↩ Khôi phục bảng mặc định
       </button>
     </div>

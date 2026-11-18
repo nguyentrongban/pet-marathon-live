@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ABILITY_BY_ID, DEFAULT_SETTINGS, GiftEngine, advance, applyAbility, applyChaosEvent,
-  createRace, fillBots, finishRace, joinRacer, parseTarget, startRace,
+  createRace, fillBots, finishRace, giftIcon, joinRacer, parseTarget, startRace,
 } from './engine'
 import { normalizeEvent, parseCommand } from './adapter'
 import { TikTokWS, WS_STATUS } from './wsClient'
@@ -188,9 +188,9 @@ export function usePetMarathon() {
         id: ev.id || `${ev.userId}:${ev.giftName}:${Date.now()}`,
         giftName: ev.giftName, nickname: ev.nickname, userId: ev.userId, text: ev.text || '',
       })
-      if (res.ok) logWs(`🎁 ${ev.nickname} tặng ${ev.giftName} → ${ABILITY_BY_ID[res.abilityId]?.name || ''}`)
-      else if (res.reason === 'unmapped') logWs(`🎁 ${ev.nickname} tặng ${ev.giftName} (chưa gán chiêu — xem tab Quà & Chiêu)`)
-      else if (res.reason !== 'duplicate') logWs(`🎁 ${ev.nickname} tặng ${ev.giftName}: ${res.reason}`)
+      if (res.ok) logWs(`${giftIcon(ev.giftName)} ${ev.nickname} tặng ${ev.giftName} → ${ABILITY_BY_ID[res.abilityId]?.name || ''}`)
+      else if (res.reason === 'unmapped') logWs(`${giftIcon(ev.giftName)} ${ev.nickname} tặng ${ev.giftName} (chưa gán chiêu — xem tab Quà & Chiêu)`)
+      else if (res.reason !== 'duplicate') logWs(`${giftIcon(ev.giftName)} ${ev.nickname} tặng ${ev.giftName}: ${res.reason}`)
       takeSnap()
       return
     }
