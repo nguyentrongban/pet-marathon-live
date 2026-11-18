@@ -8,7 +8,7 @@ import {
   ABILITY_BY_ID, DEFAULT_SETTINGS, GiftEngine, advance, applyAbility, applyChaosEvent,
   createRace, fillBots, finishRace, giftIcon, joinRacer, parseTarget, startRace,
 } from './engine'
-import { normalizeEvent, parseCommand } from './adapter'
+import { createSeqTracker, normalizeEvent, parseCommand } from './adapter'
 import { TikTokWS, WS_STATUS } from './wsClient'
 import { SoundEngine } from './sound'
 import { onSyncMessage, postHeartbeat, postHello, postState } from './sync'
@@ -53,6 +53,11 @@ export function usePetMarathon() {
   if (!soundRef.current) soundRef.current = new SoundEngine()
   const wsRef = useRef(null)
   const pendingJoinsRef = useRef([])
+  // Bắt kịp sau khi rớt mạng: seq cao nhất đã nhận + các seq đã áp dụng
+  // (để bỏ qua event trùng khi connector gửi lại).
+  const lastSeqRef = useRef(0)
+  const seqTrackerRef = useRef(null)
+  if (!seqTrackerRef.current) seqTrackerRef.current = createSeqTracker()
 
   const [snap, setSnap] = useState(null)
   const [wsStatus, setWsStatus] = useState(WS_STATUS.IDLE)
@@ -374,10 +379,30 @@ export function usePetMarathon() {
     const ws = new TikTokWS({
       onStatus: (st, detail) => { setWsStatus(st); setWsDetail(detail || '') },
       onRaw: () => {},
+      // Mở nối xong là xin ngay các event đã lỡ khi rớt mạng.
+      onOpen: () => { wsRef.current?.send({ type: 'sync', lastSeq: lastSeqRef.current }) },
       onEvent: (raw) => {
-        const norm = normalizeEvent(raw)
-        const list = Array.isArray(norm) ? norm : [norm]
-        for (const ev of list) if (ev) handleEvent(ev)
+        let obj = raw
+        if (typeof raw === 'string') {
+          try { obj = JSON.parse(raw) } catch { obj = raw }
+        }
+        // Áp dụng 1 event: bỏ qua nếu seq đã nhận rồi (tránh tính 2 lần),
+        // rồi mới đưa qua bộ chuẩn hóa như event live bình thường.
+        const deliver = (item) => {
+          if (item && typeof item === 'object' && typeof item.seq === 'number') {
+            if (seqTrackerRef.current.seen(item.seq)) return
+            lastSeqRef.current = Math.max(lastSeqRef.current, item.seq)
+          }
+          const norm = normalizeEvent(item)
+          const list = Array.isArray(norm) ? norm : [norm]
+          for (const ev of list) if (ev) handleEvent(ev)
+        }
+        // Gói bắt kịp từ connector: { type: 'catchup', events: [...] }
+        if (obj && typeof obj === 'object' && obj.type === 'catchup' && Array.isArray(obj.events)) {
+          for (const item of obj.events) deliver(item)
+          return
+        }
+        deliver(obj)
       },
     })
     wsRef.current = ws

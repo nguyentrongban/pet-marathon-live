@@ -34,10 +34,11 @@ export function buildWsUrl(baseUrl, accessCode) {
 }
 
 export class TikTokWS {
-  constructor({ onEvent, onStatus, onRaw }) {
+  constructor({ onEvent, onStatus, onRaw, onOpen }) {
     this.onEvent = onEvent
     this.onStatus = onStatus
     this.onRaw = onRaw
+    this.onOpen = onOpen
     this.ws = null
     this.wantOpen = false
     this.url = ''
@@ -79,6 +80,7 @@ export class TikTokWS {
     ws.onopen = () => {
       this.attempt = 0
       this.setStatus(WS_STATUS.OPEN, 'Đã nối TikTok LIVE')
+      this.onOpen?.()
     }
     ws.onmessage = (ev) => {
       this.onRaw?.(ev.data)

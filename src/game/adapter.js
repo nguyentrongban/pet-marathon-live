@@ -90,6 +90,24 @@ export function normalizeEvent(rawInput) {
   }
 }
 
+// ─── Bắt kịp sau khi rớt mạng ─────────────────────────────────────────────
+// Connector đánh số thứ tự (seq) cho mỗi event và giữ lại 5 phút gần nhất.
+// Game ghi nhớ các seq đã nhận để bỏ qua event trùng khi nhận lại —
+// live và catch-up đều đi qua đây nên 1 event không bao giờ tính 2 lần.
+export function createSeqTracker(limit = 1000) {
+  const seen = new Set()
+  return {
+    // Trả về true nếu seq này đã nhận rồi (bỏ qua), false nếu mới (ghi nhận).
+    seen(seq) {
+      if (typeof seq !== 'number') return false
+      if (seen.has(seq)) return true
+      seen.add(seq)
+      while (seen.size > limit) seen.delete(seen.values().next().value)
+      return false
+    },
+  }
+}
+
 // ─── Lệnh từ bình luận ─────────────────────────────────────────────────────
 // THAM GIA / JOIN → vào đua · DỪNG / TIẾP / +30S → chỉ streamer (hook kiểm tra ID)
 // Lệnh chiêu (chỉ streamer, để test trực tiếp trên live): "@Tên chuối" /
@@ -133,7 +151,8 @@ export function parseCommand(comment) {
   const text = String(comment).trim()
   if (!text) return null
   const norm = text.toUpperCase()
-  const first = norm.split(/[\s,.!?:;]+/).filter(Boolean)[0] || ''
+  // Bỏ dấu @ ở đầu từ đầu tiên: "@Thamgia" hay "@THAM GIA" vẫn tính là THAM GIA.
+  const first = (norm.split(/[\s,.!?:;]+/).filter(Boolean)[0] || '').replace(/^@+/, '')
   if (['THAMGIA', 'THAM', 'JOIN', 'VÀO', 'VAO', 'CHƠI', 'CHOI', 'ĐUA', 'DUA'].includes(first)
     || norm.startsWith('THAM GIA') || norm.startsWith('THAMGIA')) return { cmd: 'join' }
   if (['START', 'BẮTĐẦU', 'BẮT', 'ĐẦU'].includes(first) || norm.startsWith('BẮT ĐẦU') || norm.startsWith('BAT DAU')) return { cmd: 'start' }

@@ -2,7 +2,7 @@
 // Test logic thuần (không cần framework): chạy bằng `node tests/battle.test.js`
 // hoặc `npm test`. Mỗi test là 1 hàm assert, in PASS/FAIL rồi tổng kết.
 import assert from 'node:assert'
-import { parseCommand } from '../src/game/adapter.js'
+import { createSeqTracker, parseCommand } from '../src/game/adapter.js'
 import {
   ABILITIES, BOT_NAMES, CHAOS_EVENTS, DEFAULT_SETTINGS, GiftEngine, PET_TYPES, advance,
   applyAbility, applyChaosEvent, clearNegatives, createRace, currentSpeedMult, fillBots,
@@ -180,6 +180,22 @@ test('lệnh chiêu bằng bình luận: @Tên + từ chiêu', () => {
   assert.deepEqual(parseCommand('@Minh tên lửa'), { cmd: 'ability', abilityId: 'rocket', targetText: '@MINH' })
   assert.equal(parseCommand('hello mọi người'), null)
   assert.deepEqual(parseCommand('THAM GIA'), { cmd: 'join' })
+  // Dấu @ ở đầu vẫn tính: khán giả hay gõ "@Thamgia".
+  assert.deepEqual(parseCommand('@Thamgia'), { cmd: 'join' })
+  assert.deepEqual(parseCommand('@THAM GIA'), { cmd: 'join' })
+})
+
+test('bộ nhớ seq: event trùng chỉ tính 1 lần (bắt kịp sau rớt mạng)', () => {
+  const t = createSeqTracker(3)
+  assert.equal(t.seen(1), false)
+  assert.equal(t.seen(1), true)
+  assert.equal(t.seen(2), false)
+  assert.equal(t.seen('x'), false)
+  assert.equal(t.seen(3), false)
+  assert.equal(t.seen(4), false)
+  // Quá giới hạn 3: seq cũ nhất (1) bị quên, nhận lại thì tính là mới.
+  assert.equal(t.seen(1), false)
+  assert.equal(t.seen(4), true)
 })
 
 test('không chọn mục tiêu → đánh đối thủ ngẫu nhiên, không đánh thú của mình', () => {
