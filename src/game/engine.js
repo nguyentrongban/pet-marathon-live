@@ -154,7 +154,7 @@ export const DEFAULT_SETTINGS = {
   attackCooldownSec: 5,      // cùng 1 thú không bị đánh 2 lần trong 5 giây
   immunitySec: 3,            // miễn nhiễm 3 giây sau khi bị đánh
   maxAttacksPerRacer: 3,     // tối đa 3 lần bị đánh / 1 cuộc đua
-  globalAttackIntervalSec: 1.5, // tối đa 1 chiêu / 1,5 giây toàn cuộc đua (còn lại xếp hàng)
+  globalAttackIntervalSec: 0.5, // tối đa 1 chiêu / 0,5 giây toàn cuộc đua (còn lại xếp hàng) — nhanh, gần như không trễ
   chaosMinSec: 40,
   chaosMaxSec: 60,
   likeBoostEvery: 100,       // mỗi 100 tim → tăng tốc ngẫu nhiên 1 thú
@@ -644,7 +644,7 @@ export class GiftEngine {
   }
   // Xử lý hàng đợi theo giới hạn toàn cục (tối đa 1 chiêu / globalAttackIntervalSec)
   process(now = this.state.now) {
-    const interval = this.state.settings.globalAttackIntervalSec ?? 1.5
+    const interval = this.state.settings.globalAttackIntervalSec ?? 0.5
     if (!this.queue.length) return null
     if (now - this.lastProcessedAt < interval) return { ok: false, reason: 'rate-limited', queued: this.queue.length }
     const job = this.queue.shift()

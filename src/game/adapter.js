@@ -92,6 +92,42 @@ export function normalizeEvent(rawInput) {
 
 // ─── Lệnh từ bình luận ─────────────────────────────────────────────────────
 // THAM GIA / JOIN → vào đua · DỪNG / TIẾP / +30S → chỉ streamer (hook kiểm tra ID)
+// Lệnh chiêu (chỉ streamer, để test trực tiếp trên live): "@Tên chuối" /
+// "chuối @Tên" → thú đó bị ném chuối; không kèm tên → chọn ngẫu nhiên.
+const stripVn = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D')
+// Từ gọi chiêu bằng bình luận (không dấu cũng được): "chuối", "vỏ chuối",
+// "dưa hấu", "lưới", "găng tay", "băng", "bom", "tên lửa", "khiên", "thuốc", "nam châm".
+const ABILITY_BY_WORD = {
+  'VO CHUOI': 'banana', 'VOCHUOI': 'banana', 'CHUOI': 'banana', 'BANANA': 'banana',
+  'DUA HAU': 'melon', 'DUAHAU': 'melon', 'MELON': 'melon', 'WATERMELON': 'melon',
+  'LUOI': 'net', 'NET': 'net',
+  'GANG TAY': 'glove', 'GANGTAY': 'glove', 'BOXING': 'glove', 'GLOVE': 'glove',
+  'BANG': 'ice', 'ICE': 'ice',
+  'BOM CHONG MAT': 'dizzy', 'CHONG MAT': 'dizzy', 'CHONGMAT': 'dizzy', 'BOM': 'dizzy', 'DIZZY': 'dizzy',
+  'TEN LUA': 'rocket', 'TENLUA': 'rocket', 'ROCKET': 'rocket',
+  'KHIEN': 'shield', 'SHIELD': 'shield',
+  'HOI PHUC': 'heal', 'HOIPHUC': 'heal', 'THUOC': 'heal', 'HEAL': 'heal', 'POTION': 'heal',
+  'NAM CHAM': 'magnet', 'NAMCHAM': 'magnet', 'MAGNET': 'magnet',
+}
+export function parseAbilityCommand(comment) {
+  if (!comment) return null
+  const flat = stripVn(comment).toUpperCase().replace(/[^A-Z0-9@#\s]/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!flat) return null
+  const tokens = flat.split(' ')
+  for (let i = 0; i < tokens.length; i++) {
+    for (const len of [3, 2, 1]) {
+      if (i + len > tokens.length) continue
+      const phrase = tokens.slice(i, i + len).join(' ')
+      const abilityId = ABILITY_BY_WORD[phrase]
+      if (abilityId) {
+        const rest = [...tokens.slice(0, i), ...tokens.slice(i + len)].join(' ').trim()
+        return { cmd: 'ability', abilityId, targetText: rest }
+      }
+    }
+  }
+  return null
+}
+
 export function parseCommand(comment) {
   if (!comment) return null
   const text = String(comment).trim()
@@ -105,5 +141,5 @@ export function parseCommand(comment) {
   if (['TIẾP', 'TIEP', 'RESUME', 'TIẾPTỤC', 'TIEPTUC', 'CHẠY', 'CHAY'].includes(first)) return { cmd: 'resume' }
   const add = norm.match(/^\+(\d+)\s*S$/)
   if (add) return { cmd: 'addTime', seconds: parseInt(add[1], 10) }
-  return null
+  return parseAbilityCommand(comment)
 }

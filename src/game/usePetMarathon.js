@@ -176,6 +176,15 @@ export function usePetMarathon() {
         takeSnap()
         return
       }
+      // Lệnh chiêu của streamer (vd: "@Tên chuối") — chỉ streamer mới dùng được,
+      // khán giả vẫn phải tặng quà. Dùng để test trực tiếp trên live.
+      if (cmd?.cmd === 'ability' && isStreamer) {
+        const targetId = parseTarget(cmd.targetText || '', s.racers)
+        const res = applyAbility(s, cmd.abilityId, { nickname: ev.nickname, userId: ev.userId }, targetId)
+        if (res.ok) sound.playForAbility(cmd.abilityId)
+        takeSnap()
+        return
+      }
       // Bình luận thường: chỉ hiện trong log, không làm gì khác
       logWs(`💬 ${ev.nickname}: ${ev.comment}`)
       return

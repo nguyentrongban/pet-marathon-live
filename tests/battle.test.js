@@ -2,6 +2,7 @@
 // Test logic thuần (không cần framework): chạy bằng `node tests/battle.test.js`
 // hoặc `npm test`. Mỗi test là 1 hàm assert, in PASS/FAIL rồi tổng kết.
 import assert from 'node:assert'
+import { parseCommand } from '../src/game/adapter.js'
 import {
   ABILITIES, BOT_NAMES, CHAOS_EVENTS, DEFAULT_SETTINGS, GiftEngine, PET_TYPES, advance,
   applyAbility, applyChaosEvent, clearNegatives, createRace, currentSpeedMult, fillBots,
@@ -107,23 +108,23 @@ test('lưới bẫy đứng yên nhưng tối đa 2,5 giây', () => {
   assert.ok(currentSpeedMult(target, s.now) > 0.9, 'hết lưới phải chạy lại được')
 })
 
-// ── 5. Giới hạn toàn cục: xếp hàng, 1 chiêu / 1,5 giây ────────────────────
+// ── 5. Giới hạn toàn cục: xếp hàng, 1 chiêu / 0,5 giây ────────────────────
 test('giới hạn toàn cục xếp hàng các chiêu đến dồn dập', () => {
   const s = freshRace()
   const eng = new GiftEngine(s)
   eng.receive({ id: 'e1', giftName: 'Hoa hồng', nickname: 'A', userId: 'a' })
   // Món thứ 2 phải là buff (heal) để không bị miễn nhiễm chặn — test này chỉ
-  // kiểm tra hàng đợi + giới hạn 1,5 giây, không kiểm tra miễn nhiễm.
+  // kiểm tra hàng đợi + giới hạn 0,5 giây, không kiểm tra miễn nhiễm.
   eng.receive({ id: 'e2', giftName: 'little kisses', nickname: 'B', userId: 'b' })
   eng.receive({ id: 'e3', giftName: 'Hạc giấy', nickname: 'C', userId: 'c' })
   assert.equal(eng.queueLength, 3)
   const first = eng.process(10)
   assert.equal(first.ok, true)
   assert.equal(eng.queueLength, 2)
-  const tooSoon = eng.process(10.5)
+  const tooSoon = eng.process(10.2)
   assert.equal(tooSoon.reason, 'rate-limited')
-  assert.equal(eng.queueLength, 2, 'chưa đủ 1,5 giây thì hàng đợi phải còn nguyên')
-  const second = eng.process(11.6)
+  assert.equal(eng.queueLength, 2, 'chưa đủ 0,5 giây thì hàng đợi phải còn nguyên')
+  const second = eng.process(10.6)
   assert.equal(second.ok, true)
   assert.equal(eng.queueLength, 1)
 })
@@ -168,6 +169,17 @@ test('giá xu quà TikTok + bậc thử thách theo xu', () => {
   assert.equal(giftTier(5), 'Thử thách vừa')
   assert.equal(giftTier(20), 'Thử thách lớn')
   assert.equal(giftTier(99), 'Thử thách cực mạnh')
+})
+
+test('lệnh chiêu bằng bình luận: @Tên + từ chiêu', () => {
+  assert.deepEqual(parseCommand('@ten vochuoi'), { cmd: 'ability', abilityId: 'banana', targetText: '@TEN' })
+  assert.deepEqual(parseCommand('chuối @Minh'), { cmd: 'ability', abilityId: 'banana', targetText: '@MINH' })
+  assert.deepEqual(parseCommand('Vỏ chuối @Lan'), { cmd: 'ability', abilityId: 'banana', targetText: '@LAN' })
+  assert.deepEqual(parseCommand('bom @Minh'), { cmd: 'ability', abilityId: 'dizzy', targetText: '@MINH' })
+  assert.deepEqual(parseCommand('dưa hấu 2'), { cmd: 'ability', abilityId: 'melon', targetText: '2' })
+  assert.deepEqual(parseCommand('@Minh tên lửa'), { cmd: 'ability', abilityId: 'rocket', targetText: '@MINH' })
+  assert.equal(parseCommand('hello mọi người'), null)
+  assert.deepEqual(parseCommand('THAM GIA'), { cmd: 'join' })
 })
 
 test('không chọn mục tiêu → đánh đối thủ ngẫu nhiên, không đánh thú của mình', () => {
