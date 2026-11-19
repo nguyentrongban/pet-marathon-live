@@ -9,7 +9,7 @@ export const PET_TYPES = [
   { id: 'cat',     name: 'Mèo Mun',   color: '#ff9f43', baseSpeed: 9.4, wobble: 0.9 },
   { id: 'dog',     name: 'Chó Vàng',  color: '#b08954', baseSpeed: 9.0, wobble: 1.1 },
   { id: 'rabbit',  name: 'Thỏ Trắng', color: '#f5f0ff', baseSpeed: 10.2, wobble: 1.6 },
-  { id: 'hamster', name: 'Chuột Béo', color: '#e8a04c', baseSpeed: 8.6, wobble: 0.7 },
+  { id: 'beaver',  name: 'Hải Ly',    color: '#e8a04c', baseSpeed: 8.6, wobble: 0.7 },
   { id: 'duck',    name: 'Vịt Con',   color: '#ffd60a', baseSpeed: 9.2, wobble: 1.2 },
   { id: 'panda',   name: 'Gấu Trúc',  color: '#e8e8e8', baseSpeed: 8.8, wobble: 0.8 },
 ]

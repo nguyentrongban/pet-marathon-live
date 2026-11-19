@@ -11,7 +11,7 @@ import { CHAOS_BY_ID } from './game/engine'
 
 const APP_VERSION = '1.0.0-render'
 
-const PET_EMOJI = { cat: '🐱', dog: '🐶', rabbit: '🐰', hamster: '🐹', duck: '🦆', panda: '🐼' }
+const PET_EMOJI = { cat: '🐱', dog: '🐶', rabbit: '🐰', beaver: '🦫', duck: '🦆', panda: '🐼' }
 const MEDAL = { 1: '🥇', 2: '🥈', 3: '🥉' }
 
 export default function App() {
