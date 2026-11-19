@@ -180,6 +180,8 @@ export const DEFAULT_SETTINGS = {
   giftMap: { ...DEFAULT_GIFT_MAP },
   streamerId: '',
   soundOn: true,
+  voiceOn: true,            // giọng đọc bình luận (FPT.AI, hết lượt thì tự chuyển giọng máy)
+  voice: 'banmai',          // giọng FPT.AI mặc định: Ban Mai — nữ, miền Bắc
 }
 
 export const BALANCE_NOTE =
@@ -795,7 +797,9 @@ export class GiftEngine {
     const job = this.queue.shift()
     this.lastProcessedAt = now
     const res = this.applyFn(job.power, job.sender, job.teamId, job.giftName)
-    return { ...res, queued: this.queue.length }
+    // Trả kèm thông tin quà để màn hiển thị đọc giọng bình luận (tên người
+    // tặng + tên quà + lực kéo) — applyPull không trả mấy thứ này.
+    return { ...res, giftName: job.giftName, sender: job.sender, power: job.power, queued: this.queue.length }
   }
   get queueLength() { return this.queue.length }
 }

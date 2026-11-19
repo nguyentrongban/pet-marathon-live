@@ -8,6 +8,7 @@ import { onSyncMessage, postCmd, postSnapshotReq } from './game/sync'
 import GiftIcon from './components/GiftIcon'
 import { BALANCE_NOTE, DEFAULT_SETTINGS, TEAMS, giftPrice, giftTier } from './game/engine'
 import { provinceRank } from './game/provinces'
+import { VOICE_OPTIONS } from './game/voice'
 
 const TABS = [
   { id: 'tug', label: (<><span className="pml-ic"><Users size={16} /></span> Kéo co</>) },
@@ -283,6 +284,24 @@ export default function AdminPage() {
             <input type="checkbox" checked={settings.soundOn !== false} onChange={(e) => updateSettings({ soundOn: e.target.checked })} />
             {' '}Bật âm thanh vui (tổng hợp, không cần file nhạc)
           </label>
+          <label className="pml-admin-check">
+            <input type="checkbox" checked={settings.voiceOn !== false} onChange={(e) => updateSettings({ voiceOn: e.target.checked })} />
+            {' '}Bật giọng đọc bình luận (tặng quà · thắng màn · bảng xếp hạng)
+          </label>
+          <div className="pml-admin-grid">
+            <label className="pml-admin-field">Giọng đọc (FPT.AI — miễn phí 100.000 ký tự/tháng)
+              <select value={settings.voice || 'banmai'} onChange={(e) => updateSettings({ voice: e.target.value })}>
+                {VOICE_OPTIONS.map((v) => (<option key={v.id} value={v.id}>{v.label}</option>))}
+              </select>
+            </label>
+          </div>
+          <p className="pml-admin-note">
+            Trạng thái giọng đọc:{' '}
+            {snap?.voiceMode === 'device'
+              ? 'đang dùng giọng máy miễn phí trên điện thoại (FPT.AI hết lượt hoặc tạm lỗi — sẽ tự thử lại sau 5 phút).'
+              : 'đang dùng giọng FPT.AI.'}
+            {' '}Hết lượt FPT.AI thì game tự chuyển sang giọng máy miễn phí, không im lặng.
+          </p>
           <p className="pml-admin-note">
             API lưu kết quả:{' '}{import.meta.env?.VITE_API_URL ? 'đã gắn địa chỉ.' : 'chưa gắn — kết quả trận chỉ hiện trên màn hình, không lưu lên mạng.'}
           </p>

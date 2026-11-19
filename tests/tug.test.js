@@ -6,6 +6,7 @@
 import assert from 'node:assert'
 import { createSeqTracker, normalizeEvent, parseCommand } from '../src/game/adapter.js'
 import { detectProvince, provinceInfo, provinceRank } from '../src/game/provinces.js'
+import { FPT_COOLDOWN_MS, VOICE_IDS, VOICE_OPTIONS, VoiceEngine, voiceTextBxh, voiceTextFinal, voiceTextGift, voiceTextLikes, voiceTextMatchWin, voiceTextRoundStart, voiceTextRoundWin } from '../src/game/voice.js'
 import {
   DEFAULT_SETTINGS, GiftEngine, MEMBER_TYPES, TEAMS, advance, applyLikes,
   applyPull, clearBxh, createMatch, endRound, findMember, giftBoost, giftPrice, giftTier,
@@ -822,6 +823,162 @@ test('Xóa BXH thì xóa luôn người ủng hộ tỉnh + đội tỉnh (bắt
   assert.equal(Object.keys(s.provinceUsers).length, 0, 'xóa BXH thì xóa người ủng hộ tỉnh')
   assert.equal(s.provinceTeams.A, null, 'xóa BXH thì xóa đội tỉnh')
   assert.equal(Object.keys(s.userProvince).length, 0)
+})
+
+
+test('câu đọc quà: quà to đủ câu, quà nhỏ ngắn, lật kèo đọc câu lật kèo', () => {
+  assert.equal(voiceTextGift({ sender: 'Bạn Tặng Thử', giftName: 'hạc giấy', effect: 100, teamName: 'Hà Nội', flip: false }), 'Bạn Tặng Thử tặng hạc giấy, cộng 100 lực kéo cho Hà Nội!')
+  assert.equal(voiceTextGift({ sender: 'Bạn Tặng Thử', giftName: 'hoa hồng', effect: 1, teamName: 'Hà Nội', flip: false }), 'Bạn Tặng Thử tặng hoa hồng!')
+  assert.equal(voiceTextGift({ sender: 'Bạn Tặng Thử', giftName: 'hạc giấy', effect: 100, teamName: 'Hà Nội', flip: true }), 'Lật kèo! Bạn Tặng Thử tặng hạc giấy, cộng 100 lực kéo cho Hà Nội!')
+})
+
+test('câu đọc thắng / đầu màn / giờ chót / tim / BXH', () => {
+  assert.equal(voiceTextRoundWin('Hà Nội', 2), 'Hà Nội thắng màn 2!')
+  assert.equal(voiceTextMatchWin('TP. Hồ Chí Minh'), 'TP. Hồ Chí Minh vô địch trận đấu!')
+  assert.equal(voiceTextRoundStart(1, 'Hà Nội', 'TP. Hồ Chí Minh'), 'Màn 1 bắt đầu! Hà Nội đấu với TP. Hồ Chí Minh!')
+  assert.equal(voiceTextFinal(), 'Giờ chót! Mười giây cuối, quà tặng nhân đôi!')
+  assert.equal(voiceTextLikes(10), 'Đủ một trăm tim, cộng thêm 10 giây!')
+  assert.equal(voiceTextBxh({ name: 'Hà Nội', power: 153 }, { nickname: 'Bạn Tặng Thử', power: 100 }), 'Bảng xếp hạng: Hà Nội dẫn đầu với 153 lực. Bạn Tặng Thử tặng nhiều nhất, 100 lực.')
+  assert.equal(voiceTextBxh({ name: 'Hà Nội', power: 153 }, null), 'Bảng xếp hạng: Hà Nội dẫn đầu với 153 lực.')
+  assert.equal(voiceTextBxh(null, null), '')
+})
+
+test('giọng mặc định là banmai (nữ miền Bắc), có đủ giọng 3 miền', () => {
+  assert.equal(DEFAULT_SETTINGS.voice, 'banmai')
+  assert.equal(DEFAULT_SETTINGS.voiceOn, true)
+  assert.ok(VOICE_IDS.has('banmai') && VOICE_IDS.has('leminh') && VOICE_IDS.has('lannhi') && VOICE_IDS.has('ngoclam'))
+  assert.equal(VOICE_OPTIONS.length, 6)
+})
+
+test('process() trả kèm tên quà + người tặng + lực để đọc giọng', () => {
+  const s = freshMatch()
+  const eng = new GiftEngine(s)
+  eng.receive({ id: 'v1', giftName: 'Hạc giấy', nickname: 'Bạn Tặng Thử', userId: 'g1', text: 'A' })
+  const done = eng.process(10)
+  assert.equal(done.ok, true)
+  assert.equal(done.giftName, 'Hạc giấy')
+  assert.equal(done.sender.nickname, 'Bạn Tặng Thử')
+  assert.equal(done.power, 100)
+  assert.equal(done.effect, 100)
+})
+
+test('hàng đợi giọng đọc: đầy thì bỏ câu ưu tiên thấp, quà nhỏ không chen được', () => {
+  const v = new VoiceEngine({ apiBase: '' }) // giọng máy, không gọi mạng
+  assert.equal(v.speak('câu đang đọc', 'normal'), true) // đang đọc → speaking=true
+  assert.equal(v.speak('quà nhỏ 1', 'low'), true)
+  assert.equal(v.speak('quà nhỏ 2', 'low'), true)
+  assert.equal(v.speak('quà nhỏ 3', 'low'), true)
+  assert.equal(v.queue.length, 3, 'hàng đợi tối đa 3')
+  assert.equal(v.speak('quà nhỏ 4', 'low'), false, 'quà nhỏ không chen khi hàng đợi đầy toàn câu thấp')
+  assert.equal(v.speak('Hà Nội thắng màn 1!', 'high'), true, 'câu thắng (ưu tiên cao) được chen vào')
+  assert.equal(v.queue.length, 3)
+  assert.ok(v.queue.some((q) => q.text === 'Hà Nội thắng màn 1!'))
+  assert.equal(v.queue.filter((q) => q.text.startsWith('quà nhỏ')).length, 2, '1 câu quà nhỏ bị bỏ để nhường chỗ')
+  v.stop()
+})
+
+test('tắt giọng đọc thì speak() không làm gì', () => {
+  const v = new VoiceEngine({ apiBase: '', enabled: false })
+  assert.equal(v.speak('xin chào', 'high'), false)
+  assert.equal(v.queue.length, 0)
+})
+
+test('câu y hệt vừa đọc trong 3 giây thì không đọc lặp', () => {
+  const v = new VoiceEngine({ apiBase: '' })
+  v.speak('Hà Nội thắng màn 1!', 'high')
+  assert.equal(v.speak('Hà Nội thắng màn 1!', 'high'), false, 'trùng câu vừa đọc thì bỏ')
+  v.stop()
+})
+
+// ─── Test bất đồng bộ: FPT.AI lỗi → giọng máy, hết 5 phút thử lại ─────────
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+async function waitIdle(v, ms = 3000) {
+  const t0 = Date.now()
+  while (v.speaking || v.queue.length) {
+    if (Date.now() - t0 > ms) throw new Error('giọng đọc kẹt quá lâu')
+    await sleep(10)
+  }
+}
+// Giả lập trình duyệt cho VoiceEngine: Audio phát xong ngay + giọng máy ghi câu đọc.
+function mockBrowser() {
+  const spoken = []
+  globalThis.window = {
+    Audio: class {
+      constructor() { this.src = '' }
+      play() {
+        setTimeout(() => { if (this.onended) this.onended() }, 0)
+        return Promise.resolve()
+      }
+      pause() {}
+    },
+    speechSynthesis: {
+      getVoices: () => [{ lang: 'vi-VN', name: 'Tiếng Việt' }],
+      speak(u) { spoken.push(u.text); setTimeout(() => { if (u.onend) u.onend() }, 0) },
+      cancel() {},
+    },
+  }
+  globalThis.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; this.lang = ''; this.rate = 1 } }
+  return spoken
+}
+function unmockBrowser() { delete globalThis.window; delete globalThis.SpeechSynthesisUtterance }
+
+async function asyncTest(name, fn) {
+  try { await fn(); pass++; results.push(`  ✅ ${name}`) }
+  catch (e) { fail++; results.push(`  ❌ ${name}\n     → ${e.message}`) }
+}
+
+await asyncTest('FPT.AI lỗi (hết lượt) → tự chuyển giọng máy miễn phí, vẫn đọc được', async () => {
+  const spoken = mockBrowser()
+  const origFetch = globalThis.fetch
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ ok: false, error: 'fpt-error' }) })
+  try {
+    const modes = []
+    const v = new VoiceEngine({ apiBase: 'https://api.test', onModeChange: (m) => modes.push(m) })
+    assert.equal(v.getMode(), 'fpt')
+    // Các engine ở test đồng bộ trước đó còn chạy ngầm — câu của chúng chỉ
+    // đọc khi tới lượt await đầu tiên (sau khi mock được gắn), nên không
+    // đếm tuyệt đối mà kiểm tra câu quà có được đọc không.
+    v.speak('Bạn Tặng Thử tặng hạc giấy, cộng 100 lực kéo cho Hà Nội!', 'normal')
+    await waitIdle(v)
+    assert.equal(v.getMode(), 'device', 'lỗi FPT.AI thì chuyển sang giọng máy')
+    assert.deepEqual(modes, ['device'])
+    assert.ok(spoken.some((t) => t.includes('hạc giấy')), 'giọng máy vẫn đọc câu đó')
+    assert.ok(v.fptCooldownUntil > Date.now(), 'đặt 5 phút nghỉ trước khi thử lại FPT.AI')
+    assert.equal(FPT_COOLDOWN_MS, 5 * 60 * 1000)
+    // Trong 5 phút nghỉ thì không gọi FPT.AI nữa (đi thẳng giọng máy).
+    // Tới đây các câu rò rỉ đã đọc xong nên đếm tăng thêm là chính xác.
+    const before2 = spoken.length
+    let fetchCalls = 0
+    globalThis.fetch = async () => { fetchCalls++; return { ok: true, json: async () => ({ ok: true, url: 'https://x/y.mp3' }) } }
+    v.speak('Hà Nội thắng màn 1!', 'high')
+    await waitIdle(v)
+    assert.equal(fetchCalls, 0, 'đang trong 5 phút nghỉ thì không gọi FPT.AI')
+    assert.equal(spoken.length, before2 + 1)
+  } finally {
+    globalThis.fetch = origFetch
+    unmockBrowser()
+  }
+})
+
+await asyncTest('hết 5 phút nghỉ thì thử lại FPT.AI, được thì nối lại giọng FPT.AI', async () => {
+  const spoken = mockBrowser()
+  const origFetch = globalThis.fetch
+  try {
+    const modes = []
+    const v = new VoiceEngine({ apiBase: 'https://api.test', onModeChange: (m) => modes.push(m) })
+    // Giả vờ vừa lỗi xong: đang ở giọng máy, 5 phút nghỉ đã hết.
+    v.mode = 'device'
+    v.fptCooldownUntil = Date.now() - 1
+    globalThis.fetch = async () => ({ ok: true, json: async () => ({ ok: true, url: 'https://x/y.mp3' }) })
+    v.speak('Hà Nội thắng màn 1!', 'high')
+    await waitIdle(v)
+    assert.equal(v.getMode(), 'fpt', 'FPT.AI chạy lại được thì nối lại')
+    assert.deepEqual(modes, ['fpt'])
+    assert.equal(spoken.length, 0, 'dùng FPT.AI thì không đọc bằng giọng máy')
+  } finally {
+    globalThis.fetch = origFetch
+    unmockBrowser()
+  }
 })
 
 

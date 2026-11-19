@@ -14,6 +14,14 @@ const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '')
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || ''
 const supabaseOn = Boolean(SUPABASE_URL && SUPABASE_KEY)
 
+// Giọng đọc bình luận (FPT.AI): key nằm ở env FPT_API_KEY trên service,
+// không bao giờ lộ ra trình duyệt. Hết lượt / chưa có key thì game tự
+// chuyển sang giọng máy miễn phí trên điện thoại.
+const FPT_API_KEY = process.env.FPT_API_KEY || ''
+const FPT_TTS_URL = 'https://api.fpt.ai/hmi/tts/v5'
+const FPT_VOICES = new Set(['banmai', 'leminh', 'lannhi', 'thuminh', 'ngoclam', 'hatieumai', 'female', 'male'])
+let lastTtsAt = 0
+
 // Lưu tạm trong bộ nhớ khi chưa nối Supabase
 const memoryResults = []
 const memoryGifts = []
@@ -79,11 +87,11 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return sendJson(res, 204, {})
 
   if (req.method === 'GET' && url.pathname === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'pet-marathon-live-api', supabase: supabaseOn, time: new Date().toISOString() })
+    return sendJson(res, 200, { ok: true, service: 'pet-marathon-live-api', supabase: supabaseOn, tts: Boolean(FPT_API_KEY), time: new Date().toISOString() })
   }
 
   if (req.method === 'GET' && url.pathname === '/') {
-    return sendJson(res, 200, { ok: true, service: 'pet-marathon-live-api', endpoints: ['GET /health', 'POST /match-result', 'GET /leaderboard'] })
+    return sendJson(res, 200, { ok: true, service: 'pet-marathon-live-api', endpoints: ['GET /health', 'POST /match-result', 'GET /leaderboard', 'POST /tts'] })
   }
 
   if (req.method === 'POST' && url.pathname === '/match-result') {
@@ -122,6 +130,50 @@ const server = http.createServer(async (req, res) => {
       }
     }
     return sendJson(res, 200, { ok: true, source: 'memory', rows: aggregate(memoryResults) })
+  }
+
+  // ── POST /tts: đọc 1 câu bằng giọng FPT.AI (Ban Mai mặc định) ─────────
+  // Game gọi để làm giọng bình luận: tặng quà / thắng màn / BXH. FPT.AI
+  // trả về link mp3 (async) — chờ link sẵn rồi mới trả về game để game
+  // bấm phát là có tiếng ngay. Hết lượt / lỗi → trả ok:false để game tự
+  // chuyển sang giọng máy miễn phí trên điện thoại (không im lặng).
+  if (req.method === 'POST' && url.pathname === '/tts') {
+    let body
+    try { body = await readBody(req) } catch { return sendJson(res, 400, { ok: false, error: 'bad-json' }) }
+    const text = String(body.text || '').trim()
+    const voice = FPT_VOICES.has(String(body.voice || '')) ? String(body.voice) : 'banmai'
+    if (!text || text.length > 500) return sendJson(res, 400, { ok: false, error: 'bad-text' })
+    if (!FPT_API_KEY) return sendJson(res, 200, { ok: false, error: 'no-key' })
+    // Chống spam / giữ lượt miễn phí: tối đa 1 lượt đọc / 1,2 giây toàn service.
+    const nowMs = Date.now()
+    if (nowMs - lastTtsAt < 1200) return sendJson(res, 200, { ok: false, error: 'busy' })
+    lastTtsAt = nowMs
+    try {
+      const fpt = await fetch(FPT_TTS_URL, {
+        method: 'POST',
+        // Đúng y lệnh curl của streamer: chỉ 2 header api-key + voice, body là text.
+        headers: { 'api-key': FPT_API_KEY, voice },
+        body: text,
+        signal: AbortSignal.timeout(15000),
+      })
+      const data = await fpt.json().catch(() => ({}))
+      if (!fpt.ok || data.error !== 0 || !data.async) {
+        return sendJson(res, 200, { ok: false, error: 'fpt-error' })
+      }
+      // Link mp3 chỉ sẵn sau vài giây — chờ tới khi tải được (tối đa 12s).
+      const audioUrl = data.async
+      const deadline = Date.now() + 12000
+      while (Date.now() < deadline) {
+        try {
+          const head = await fetch(audioUrl, { method: 'HEAD', signal: AbortSignal.timeout(3000) })
+          if (head.ok) return sendJson(res, 200, { ok: true, url: audioUrl, voice })
+        } catch { /* chưa sẵn — chờ tiếp */ }
+        await new Promise((r) => setTimeout(r, 600))
+      }
+      return sendJson(res, 200, { ok: false, error: 'timeout' })
+    } catch {
+      return sendJson(res, 200, { ok: false, error: 'tts-failed' })
+    }
   }
 
   return sendJson(res, 404, { ok: false, error: 'Không tìm thấy đường dẫn này' })

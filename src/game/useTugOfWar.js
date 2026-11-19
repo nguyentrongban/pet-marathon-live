@@ -7,12 +7,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   DEFAULT_SETTINGS, GiftEngine, TEAMS, advance, applyLikes, applyPull,
   clearBxh, provinceLeader, createMatch, giftIcon, joinProvince, joinTeam, migrateGiftMap, pushToast,
-  startMatch, startRound, syncProvinceTeams, topProvinces, topProvincesByComments, topGifters, topLikers,
+  startMatch, startRound, syncProvinceTeams, teamLabel, topProvinces, topProvincesByComments, topGifters, topLikers,
 } from './engine'
 import { provinceInfo, detectProvince } from './provinces'
 import { createSeqTracker, normalizeEvent, parseCommand } from './adapter'
 import { TikTokWS, WS_STATUS } from './wsClient'
 import { SoundEngine } from './sound'
+import { VoiceEngine, voiceTextBxh, voiceTextFinal, voiceTextGift, voiceTextLikes, voiceTextMatchWin, voiceTextRoundStart, voiceTextRoundWin } from './voice'
 import { onSyncMessage, postHeartbeat, postHello, postState } from './sync'
 
 const SETTINGS_KEY = 'pml-settings-v1'
@@ -116,12 +117,29 @@ export function useTugOfWar() {
   const [muted, setMuted] = useState(() => !loadSettings().soundOn)
   const prevCountRef = useRef(null)
   const prevPhaseRef = useRef(null)
+  const prevFinalTimeRef = useRef(false)
   const prevRoundWinnerRef = useRef(null)
   const reportedMatchRef = useRef('')
 
   const logWs = useCallback((line) => {
     setWsLog((prev) => [{ at: new Date().toLocaleTimeString('vi-VN'), line }, ...prev].slice(0, 40))
   }, [])
+
+  // ── Giọng đọc bình luận (FPT.AI Ban Mai mặc định; hết lượt / lỗi thì tự
+  // chuyển giọng máy miễn phí trên điện thoại, thử lại FPT.AI sau 5 phút).
+  const voiceRef = useRef(null)
+  if (!voiceRef.current) {
+    const settings0 = loadSettings()
+    voiceRef.current = new VoiceEngine({
+      apiBase: import.meta.env?.VITE_API_URL || '',
+      voice: settings0.voice || 'banmai',
+      enabled: settings0.voiceOn !== false && settings0.soundOn !== false,
+      onModeChange: (mode) => {
+        if (mode === 'device') logWs('🎙️ Hết lượt / lỗi giọng FPT.AI — đang dùng giọng máy miễn phí, thử lại sau 5 phút.')
+        else logWs('🎙️ Đã nối lại giọng FPT.AI.')
+      },
+    })
+  }
 
   // ── Gửi kết quả trận về API (nếu có cấu hình) — không có thì bỏ qua lặng lẽ ──
   const reportMatch = useCallback((state) => {
@@ -171,6 +189,7 @@ export function useTugOfWar() {
       provinceBattle: topProvincesByComments(s, 2),
       queueLength: engineRef.current.queueLength,
       settings: s.settings,
+      voiceMode: voiceRef.current ? voiceRef.current.getMode() : 'device',
       pendingJoins: pendingJoinsRef.current.length,
     })
   }, [])
@@ -277,7 +296,10 @@ export function useTugOfWar() {
       // Tim chỉ +thời gian kéo (tính theo từng người: đủ 100 tim → +10s).
       // BXH tim ghi tên người thả để bảng nhỏ ở góc trái có người đứng đầu.
       const added = applyLikes(s, ev.userId, ev.likeCount, ev.nickname, ev.avatar || '')
-      if (added > 0) sound.coin()
+      if (added > 0) {
+        sound.coin()
+        voiceRef.current.speak(voiceTextLikes(added * (s.settings.likeTimeSeconds || 10)), 'low')
+      }
       takeSnap()
       return
     }
@@ -366,6 +388,8 @@ export function useTugOfWar() {
         Object.assign(s.settings, msg.settings || {})
         if (msg.settings?.giftMap) s.settings.giftMap = migrateGiftMap(msg.settings.giftMap)
         sound.enabled = s.settings.soundOn !== false
+        if (msg.settings?.voice) voiceRef.current?.setVoice(msg.settings.voice)
+        voiceRef.current?.setEnabled(s.settings.soundOn !== false && s.settings.voiceOn !== false)
         saveSettings(s.settings)
         takeSnap()
       } else if (msg.cmd === 'connect') {
@@ -387,6 +411,7 @@ export function useTugOfWar() {
       } else if (msg.cmd === 'toggleSound') {
         s.settings.soundOn = !s.settings.soundOn
         sound.enabled = s.settings.soundOn
+        voiceRef.current?.setEnabled(s.settings.soundOn && s.settings.voiceOn !== false)
         saveSettings(s.settings)
         setMuted(!s.settings.soundOn)
         takeSnap()
@@ -405,6 +430,7 @@ export function useTugOfWar() {
     let lastBroadcast = 0
     let lastHeartbeat = 0
     let lastBxhSave = 0
+    let lastBxhVoice = 0
     const step = () => {
       const nowMs = performance.now()
       const dt = Math.min(5, Math.max(0, (nowMs - lastTick) / 1000))
@@ -415,19 +441,40 @@ export function useTugOfWar() {
         advance(s, dt)
         // Xử lý hàng đợi quà theo giới hạn toàn cục
         const done = engineRef.current.process(s.now)
-        if (done?.ok) soundRef.current.playForPull(done.effect || 0)
+        if (done?.ok) {
+          soundRef.current.playForPull(done.effect || 0)
+          // Giọng đọc quà: quà to đọc đủ câu, quà nhỏ đọc ngắn; lật kèo
+          // thì đọc câu lật kèo. Quà thử (Admin/demo) không qua hàng đợi
+          // nên không đọc — chỉ quà thật mới đọc.
+          voiceRef.current.speak(voiceTextGift({
+            sender: done.sender?.nickname || 'Khán giả',
+            giftName: done.giftName || 'quà',
+            effect: done.effect || 0,
+            teamName: teamLabel(s, done.teamId),
+            flip: !!done.flip,
+          }), done.flip ? 'high' : (done.effect >= 25 ? 'normal' : 'low'))
+        }
         // Âm thanh đếm ngược / bắt đầu kéo
         const c = Math.ceil(s.countdown)
         if (s.phase === 'countdown' && c !== prevCountRef.current) {
           prevCountRef.current = c
           if (c > 0) soundRef.current.countdown()
         }
-        if (s.phase === 'pulling' && prevPhaseRef.current !== 'pulling') soundRef.current.go()
-        // Thắng màn / thắng trận: kèn + té bùn
+        if (s.phase === 'pulling' && prevPhaseRef.current !== 'pulling') {
+          soundRef.current.go()
+          // Giọng đọc đầu màn: 2 tỉnh/đội nào đấu nhau.
+          voiceRef.current.speak(voiceTextRoundStart(s.round, teamLabel(s, 'A'), teamLabel(s, 'B')), 'normal')
+        }
+        // Giờ chót: đọc 1 lần khi vừa vào 10 giây cuối.
+        if (s.finalTime && !prevFinalTimeRef.current) voiceRef.current.speak(voiceTextFinal(), 'normal')
+        prevFinalTimeRef.current = !!s.finalTime
+        // Thắng màn / thắng trận: kèn + té bùn + giọng đọc.
         if (s.roundWinner && s.roundWinner !== prevRoundWinnerRef.current) {
           prevRoundWinnerRef.current = s.roundWinner
           soundRef.current.cheer()
           soundRef.current.splash()
+          if (s.matchWinner) voiceRef.current.speak(voiceTextMatchWin(teamLabel(s, s.matchWinner)), 'high')
+          else voiceRef.current.speak(voiceTextRoundWin(teamLabel(s, s.roundWinner), s.round), 'high')
         }
         if (s.phase === 'matchEnd') reportMatch(s)
         if (!s.roundWinner) prevRoundWinnerRef.current = null
@@ -437,6 +484,12 @@ export function useTugOfWar() {
       if (nowMs - lastBroadcast > 500) { lastBroadcast = nowMs; broadcastState() }
       // Lưu BXH mỗi 5 giây — tải lại trang vẫn còn (mất tối đa 5 giây cuối).
       if (nowMs - lastBxhSave > 5000) { lastBxhSave = nowMs; saveBxh(s) }
+      // Giọng đọc BXH mỗi 60 giây trong lúc kéo (chỉ khi có dữ liệu).
+      if (s.phase === 'pulling' && nowMs - lastBxhVoice > 60000) {
+        lastBxhVoice = nowMs
+        const bxhText = voiceTextBxh(provinceLeader(s), topGifters(s, 1)[0] || null)
+        if (bxhText) voiceRef.current.speak(bxhText, 'normal')
+      }
       if (nowMs - lastHeartbeat > 2000) {
         lastHeartbeat = nowMs
         postHeartbeat({ phase: s.phase, round: s.round, matchId: s.matchId })
@@ -486,7 +539,7 @@ export function useTugOfWar() {
 
   // ── Mở khóa âm thanh sau lần chạm đầu (trình duyệt chặn autoplay) ──
   useEffect(() => {
-    const unlock = () => soundRef.current.ensure()
+    const unlock = () => { soundRef.current.ensure(); voiceRef.current?.unlock() }
     window.addEventListener('pointerdown', unlock)
     return () => window.removeEventListener('pointerdown', unlock)
   }, [])
@@ -581,6 +634,7 @@ export function useTugOfWar() {
     const s = stateRef.current
     s.settings.soundOn = !s.settings.soundOn
     soundRef.current.enabled = s.settings.soundOn
+    voiceRef.current?.setEnabled(s.settings.soundOn && s.settings.voiceOn !== false)
     saveSettings(s.settings)
     setMuted(!s.settings.soundOn)
     takeSnap()
