@@ -5,8 +5,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  DEFAULT_SETTINGS, GiftEngine, TEAMS, advance, applyLikeBoost, applyPull,
-  createMatch, giftIcon, joinTeam, migrateGiftMap, startMatch, startRound,
+  DEFAULT_SETTINGS, GiftEngine, TEAMS, advance, applyLikes, applyPull,
+  clearBxh, createMatch, giftIcon, joinTeam, migrateGiftMap, pushToast,
+  startMatch, startRound, topGifters, topLikers,
 } from './engine'
 import { createSeqTracker, normalizeEvent, parseCommand } from './adapter'
 import { TikTokWS, WS_STATUS } from './wsClient'
@@ -15,12 +16,37 @@ import { onSyncMessage, postHeartbeat, postHello, postState } from './sync'
 
 const SETTINGS_KEY = 'pml-settings-v1'
 const WS_KEY = 'pml-ws-v1'
+const BXH_KEY = 'pml-bxh-v1' // BXH (ai tặng quà / thả tim nhiều nhất) — lưu lại qua các màn/trận + tải lại trang
+
+// BXH lưu ở localStorage trên màn hiển thị (cùng máy với game): tải lại
+// trang vẫn còn, chỉ mất khi streamer bấm Xóa BXH ở Admin.
+export function loadBxh() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BXH_KEY) || '{}')
+    return {
+      giftTotals: raw.giftTotals && typeof raw.giftTotals === 'object' ? raw.giftTotals : {},
+      likeTotals: raw.likeTotals && typeof raw.likeTotals === 'object' ? raw.likeTotals : {},
+    }
+  } catch { return { giftTotals: {}, likeTotals: {} } }
+}
+function saveBxh(state) {
+  try {
+    localStorage.setItem(BXH_KEY, JSON.stringify({
+      giftTotals: state.giftTotals || {},
+      likeTotals: state.likeTotals || {},
+    }))
+  } catch { /* ignore */ }
+}
 
 export function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
     if (!raw) return { ...DEFAULT_SETTINGS, giftMap: { ...DEFAULT_SETTINGS.giftMap } }
     const saved = JSON.parse(raw)
+    // Đổi luật 2026-11-19: thắng 3 màn → thắng 2 màn (best of 3, tối đa 3
+    // màn). Máy nào còn lưu giá trị mặc định cũ (3) thì đổi sang 2; ai
+    // chỉnh tay khác 3 thì giữ nguyên lựa chọn của họ.
+    if (saved.winsToMatch === 3) saved.winsToMatch = 2
     return {
       ...DEFAULT_SETTINGS,
       ...saved,
@@ -44,6 +70,10 @@ export function useTugOfWar() {
     const st = createMatch(settings)
     st.paused = false
     st.pendingJoins = []
+    // BXH lưu lại từ phiên trước (tải lại trang vẫn còn).
+    const bxh = loadBxh()
+    st.giftTotals = bxh.giftTotals
+    st.likeTotals = bxh.likeTotals
     stateRef.current = st
   }
   const engineRef = useRef(null)
@@ -107,12 +137,14 @@ export function useTugOfWar() {
       },
       teamCounts: { A: s.teams.A.members.length, B: s.teams.B.members.length },
       roundWinner: s.roundWinner, matchWinner: s.matchWinner,
-      luckyStar: s.luckyStar,
+      luckyStar: s.luckyStar, streak: { ...s.streak },
+      finalTime: !!s.finalTime, timeAddedByLikes: s.timeAddedByLikes || 0,
       feed: s.feed.slice(-8),
       floaters: [...s.floaters],
       effects: [...s.effects],
       stats: { ...s.stats },
       likes: s.likes,
+      bxh: { gifters: topGifters(s, 3), likers: topLikers(s, 3) },
       queueLength: engineRef.current.queueLength,
       settings: s.settings,
       pendingJoins: pendingJoinsRef.current.length,
@@ -128,11 +160,13 @@ export function useTugOfWar() {
       roundTimeLeft: s.roundTimeLeft, matchId: s.matchId, round: s.round,
       rope: s.rope,
       teams: {
-        A: { roundWins: s.teams.A.roundWins, totalPull: s.teams.A.totalPull, members: s.teams.A.members.map((m) => ({ nickname: m.nickname, pulls: m.pulls, gifts: m.gifts })) },
-        B: { roundWins: s.teams.B.roundWins, totalPull: s.teams.B.totalPull, members: s.teams.B.members.map((m) => ({ nickname: m.nickname, pulls: m.pulls, gifts: m.gifts })) },
+        A: { roundWins: s.teams.A.roundWins, totalPull: s.teams.A.totalPull, pullRate: s.teams.A.pullRate, boost: s.teams.A.boost, members: s.teams.A.members.map((m) => ({ nickname: m.nickname, pulls: m.pulls, gifts: m.gifts })) },
+        B: { roundWins: s.teams.B.roundWins, totalPull: s.teams.B.totalPull, pullRate: s.teams.B.pullRate, boost: s.teams.B.boost, members: s.teams.B.members.map((m) => ({ nickname: m.nickname, pulls: m.pulls, gifts: m.gifts })) },
       },
       roundWinner: s.roundWinner, matchWinner: s.matchWinner,
+      streak: { ...s.streak }, finalTime: !!s.finalTime, timeAddedByLikes: s.timeAddedByLikes || 0,
       feed: s.feed.slice(-8), stats: s.stats, likes: s.likes,
+      bxh: { gifters: topGifters(s, 3), likers: topLikers(s, 3) },
       queueLength: engineRef.current.queueLength,
       settings: s.settings, wsStatus, wsDetail,
       wsLog: wsLog.slice(0, 30),
@@ -159,7 +193,7 @@ export function useTugOfWar() {
       const isStreamer = streamerId && (ev.userId.toLowerCase() === streamerId || ev.nickname.toLowerCase() === streamerId)
       if (cmd?.cmd === 'join' || cmd?.cmd === 'joinTeam') {
         const teamId = cmd.cmd === 'joinTeam' ? cmd.teamId : 'balance'
-        const r = joinTeam(s, teamId, ev.nickname, ev.userId)
+        const r = joinTeam(s, teamId, ev.nickname, ev.userId, ev.avatar || '')
         if (!r.ok && r.reason === 'full') {
           pendingJoinsRef.current.push({ nickname: ev.nickname, userId: ev.userId, teamId })
         }
@@ -187,6 +221,7 @@ export function useTugOfWar() {
       const res = engineRef.current.receive({
         id: ev.id || `${ev.userId}:${ev.giftName}:${Date.now()}`,
         giftName: ev.giftName, nickname: ev.nickname, userId: ev.userId, text: ev.text || '',
+        avatar: ev.avatar || '',
       })
       if (res.ok) logWs(`${giftIcon(ev.giftName)} ${ev.nickname} tặng ${ev.giftName} → kéo ${TEAMS[res.teamId].name} (${res.power} lực)`)
       else if (res.reason === 'unmapped') logWs(`${giftIcon(ev.giftName)} ${ev.nickname} tặng ${ev.giftName} (chưa gán lực kéo — xem tab Quà & Lực kéo)`)
@@ -196,24 +231,29 @@ export function useTugOfWar() {
     }
 
     if (ev.kind === 'like') {
-      const boosted = applyLikeBoost(s, ev.likeCount)
-      if (boosted > 0) sound.comeback()
+      // Tim chỉ +thời gian kéo (tính theo từng người: đủ 100 tim → +10s).
+      // BXH tim ghi tên người thả để bảng nhỏ ở góc trái có người đứng đầu.
+      const added = applyLikes(s, ev.userId, ev.likeCount, ev.nickname, ev.avatar || '')
+      if (added > 0) sound.coin()
       takeSnap()
       return
     }
 
     if (ev.kind === 'join') {
       s.feed.push({ id: `f${Date.now()}`, kind: 'join', text: `👋 ${ev.nickname} vừa vào xem live!`, at: s.now })
+      pushToast(s, `👋 ${ev.nickname} vừa vào xem!`)
       takeSnap()
       return
     }
     if (ev.kind === 'follow') {
       s.feed.push({ id: `f${Date.now()}`, kind: 'join', text: `💖 ${ev.nickname} vừa theo dõi!`, at: s.now })
+      pushToast(s, `💖 ${ev.nickname} vừa theo dõi!`)
       takeSnap()
       return
     }
     if (ev.kind === 'share') {
       s.feed.push({ id: `f${Date.now()}`, kind: 'join', text: `🔁 ${ev.nickname} vừa chia sẻ live!`, at: s.now })
+      pushToast(s, `🔁 ${ev.nickname} vừa chia sẻ live!`)
       takeSnap()
       return
     }
@@ -227,7 +267,7 @@ export function useTugOfWar() {
       startRound(s)
     } else if (s.phase === 'waiting' || s.phase === 'matchEnd') {
       for (const p of pendingJoinsRef.current.splice(0)) {
-        joinTeam(s, p.teamId || 'balance', p.nickname, p.userId)
+        joinTeam(s, p.teamId || 'balance', p.nickname, p.userId, p.avatar || '')
       }
       startMatch(s)
     }
@@ -246,17 +286,27 @@ export function useTugOfWar() {
       else if (msg.cmd === 'resume') { s.paused = false; takeSnap() }
       else if (msg.cmd === 'reset') {
         const settings = s.settings
+        const giftTotals = s.giftTotals || {}
+        const likeTotals = s.likeTotals || {}
         const fresh = createMatch(settings)
         fresh.paused = false
         fresh.pendingJoins = []
+        // Trận mới: xóa tỉ số + đội, nhưng GIỮ BXH (BXH tính cả phiên).
+        fresh.giftTotals = giftTotals
+        fresh.likeTotals = likeTotals
         stateRef.current = fresh
         engineRef.current = new GiftEngine(fresh)
         pendingJoinsRef.current = []
         reportedMatchRef.current = ''
         takeSnap()
+      } else if (msg.cmd === 'resetBxh') {
+        // Xóa BXH (bắt đầu live mới / ngày mới): xóa cả trên màn + localStorage.
+        clearBxh(s)
+        saveBxh(s)
+        takeSnap()
       } else if (msg.cmd === 'inject') {
         if (s.phase === 'pulling') {
-          const res = applyPull(s, msg.teamId, msg.power || 6, { nickname: msg.sender || 'Admin thử', userId: 'admin' })
+          const res = applyPull(s, msg.teamId, msg.power || 6, { nickname: msg.sender || 'Admin thử', userId: 'admin' }, '', { gift: false })
           if (res.ok) sound.playForPull(res.effect)
         }
         takeSnap()
@@ -302,6 +352,7 @@ export function useTugOfWar() {
     let lastSnap = 0
     let lastBroadcast = 0
     let lastHeartbeat = 0
+    let lastBxhSave = 0
     const step = () => {
       const nowMs = performance.now()
       const dt = Math.min(5, Math.max(0, (nowMs - lastTick) / 1000))
@@ -332,6 +383,8 @@ export function useTugOfWar() {
       }
       if (nowMs - lastSnap > 200) { lastSnap = nowMs; takeSnap() }
       if (nowMs - lastBroadcast > 500) { lastBroadcast = nowMs; broadcastState() }
+      // Lưu BXH mỗi 5 giây — tải lại trang vẫn còn (mất tối đa 5 giây cuối).
+      if (nowMs - lastBxhSave > 5000) { lastBxhSave = nowMs; saveBxh(s) }
       if (nowMs - lastHeartbeat > 2000) {
         lastHeartbeat = nowMs
         postHeartbeat({ phase: s.phase, round: s.round, matchId: s.matchId })
@@ -395,24 +448,67 @@ export function useTugOfWar() {
     if (new URLSearchParams(window.location.search).get('demo') !== '1') return
     const t1 = setTimeout(() => {
       joinTeam(stateRef.current, 'A', 'Lan Thử', 'demo-a')
+      joinTeam(stateRef.current, 'A', 'Hoa Thử', 'demo-a2')
+      joinTeam(stateRef.current, 'A', 'Nam Thử', 'demo-a3')
       joinTeam(stateRef.current, 'B', 'Minh Thử', 'demo-b')
+      joinTeam(stateRef.current, 'B', 'Linh Thử', 'demo-b2')
+      joinTeam(stateRef.current, 'B', 'Tuấn Thử', 'demo-b3')
       doStart()
+      // Tặng ngay 1 món quà to khi bắt đầu (để xem hiệu ứng pháo hoa + BXH).
+      engineRef.current.receive({
+        id: 'demo-gift-start', giftName: 'hạc giấy',
+        nickname: 'Bạn Tặng Thử', userId: 'demo-g1', text: 'A',
+      })
     }, 800)
-    const powers = [1, 3, 6, 12]
+    const powers = [1, 5, 10, 25]
     let n = 0
+    // Quà mẫu (đi qua đường quà thật để hiện hiệu ứng + lên BXH): xen kẽ
+    // quà nhỏ (hộp quà mở) + quà to (pháo hoa), 3 người tặng thay phiên.
+    const demoGifters = [
+      { nickname: 'Bạn Tặng Thử', userId: 'demo-g1' },
+      { nickname: 'Hoa Thử', userId: 'demo-g2' },
+      { nickname: 'Nam Thử', userId: 'demo-g3' },
+    ]
+    const demoGifts = ['hoa hồng', 'bing chilling', 'nước hoa', 'hạc giấy']
+    const demoLikers = [
+      { nickname: 'Bạn Tim Thử', userId: 'demo-l1' },
+      { nickname: 'Lan Thử', userId: 'demo-a' },
+      { nickname: 'Minh Thử', userId: 'demo-b' },
+    ]
+    // Có người vào xem live (để hiện toast "vừa vào xem" 2 giây).
+    const demoJoiners = ['Bạn Mới', 'Người Xem Mới', 'Khách Lạ']
     const iv = setInterval(() => {
       const s = stateRef.current
       if (!s) return
       if (s.phase === 'pulling') {
         const teamId = n % 2 === 0 ? 'A' : 'B'
         const power = powers[Math.floor(Math.random() * powers.length)]
-        applyPull(s, teamId, power, { nickname: 'Khán giả thử', userId: `demo-${n}` })
+        // Lượt kéo mẫu (không phải quà) → không hiện hiệu ứng quà.
+        applyPull(s, teamId, power, { nickname: 'Khán giả thử', userId: `demo-${n}` }, '', { gift: false })
         n++
-        if (n % 7 === 0) applyLikeBoost(s, 100)
+        // Cứ 6 nhịp thì tặng 1 món quà thật (hiện hiệu ứng + lên BXH).
+        if (n % 6 === 0) {
+          const g = demoGifters[Math.floor(n / 6) % demoGifters.length]
+          const giftName = demoGifts[Math.floor(Math.random() * demoGifts.length)]
+          engineRef.current.receive({
+            id: `demo-gift-${n}`, giftName,
+            nickname: g.nickname, userId: g.userId,
+            text: teamId,
+          })
+        }
+        if (n % 7 === 0) {
+          const liker = demoLikers[Math.floor(n / 7) % demoLikers.length]
+          applyLikes(s, liker.userId, 100, liker.nickname)
+        }
+        // Cứ 15 nhịp thì có 1 người vào xem (hiện toast 2 giây).
+        if (n % 15 === 0) {
+          const joiner = demoJoiners[Math.floor(n / 15) % demoJoiners.length]
+          handleEvent({ kind: 'join', nickname: joiner, userId: `demo-join-${n}` })
+        }
       }
     }, 700)
     return () => { clearTimeout(t1); clearInterval(iv) }
-  }, [doStart])
+  }, [doStart, handleEvent])
 
   const toggleMute = useCallback(() => {
     const s = stateRef.current

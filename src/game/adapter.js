@@ -39,11 +39,39 @@ function detectKind(obj) {
   return null
 }
 
+const AVATAR_KEYS = [
+  'profilePictureUrl', 'profile_picture_url', 'profilePic', 'profile_pic',
+  'avatar', 'avatarUrl', 'avatar_url', 'profilePicture', 'profile_picture',
+  'imageUrl', 'image_url', 'picUrl', 'pic_url', 'photoUrl', 'photo_url',
+]
+function pickAvatar(obj) {
+  if (!obj || typeof obj !== 'object') return ''
+  // Ảnh đại diện thường nằm trực tiếp hoặc lồng trong user / userInfo / author.
+  return asText(pickNested(obj, AVATAR_KEYS))
+}
+
+function pickNested(obj, keys) {
+  const direct = pick(obj, keys)
+  if (direct !== undefined) return direct
+  // Thông tin người dùng đôi khi nằm lồng trong user / userInfo / author.
+  for (const k of ['user', 'userInfo', 'user_info', 'author', 'sender', 'profile']) {
+    const nested = obj?.[k] || obj?.__outer?.[k]
+    if (nested && typeof nested === 'object') {
+      const v = pick(nested, keys)
+      if (v !== undefined) return v
+    }
+  }
+  return undefined
+}
+
 function person(obj) {
   const outer = obj.__outer || obj
-  const nickname = asText(pick(outer, ['nickname', 'displayName', 'display_name', 'username', 'userName', 'uniqueId', 'unique_id', 'userId', 'user_id', 'name']) || pick(obj, ['nickname', 'displayName', 'username', 'uniqueId', 'userId', 'name']) || 'Khán giả')
-  const userId = asText(pick(outer, ['uniqueId', 'unique_id', 'userId', 'user_id', 'secUid', 'sec_uid', 'nickname', 'username']) || nickname)
-  return { nickname, userId }
+  const nickname = asText(pickNested(outer, ['nickname', 'displayName', 'display_name', 'username', 'userName', 'uniqueId', 'unique_id', 'userId', 'user_id', 'name']) || pickNested(obj, ['nickname', 'displayName', 'username', 'uniqueId', 'userId', 'name']) || 'Khán giả')
+  const userId = asText(pickNested(outer, ['uniqueId', 'unique_id', 'userId', 'user_id', 'secUid', 'sec_uid', 'nickname', 'username']) || nickname)
+  // Ảnh đại diện TikTok (nếu connector gửi kèm) — không có thì để trống,
+  // màn 3D sẽ vẽ vòng tròn chữ cái đầu tên thay thế.
+  const avatar = pickAvatar(outer) || pickAvatar(obj)
+  return { nickname, userId, avatar }
 }
 
 export function normalizeEvent(rawInput) {
@@ -64,27 +92,27 @@ export function normalizeEvent(rawInput) {
     const obj = unwrap(raw)
     const kind = detectKind(obj)
     if (!kind) return { kind: 'unknown', reason: 'unrecognized', raw: JSON.stringify(raw).slice(0, 300) }
-    const { nickname, userId } = person(obj)
+    const { nickname, userId, avatar } = person(obj)
     const outer = obj.__outer || obj
     const eventId = asText(pick(outer, ['eventId', 'event_id', 'id', 'msgId', 'messageId']) ?? pick(obj, ['eventId', 'id'])) || undefined
     if (kind === 'chat') {
       const comment = asText(pick(outer, ['comment', 'text', 'message', 'content']) ?? pick(obj, ['comment', 'text', 'message', 'content']))
       if (!comment) return { kind: 'unknown', reason: 'chat-no-text', raw: JSON.stringify(raw).slice(0, 200) }
-      return { kind: 'chat', nickname, userId, comment, id: eventId }
+      return { kind: 'chat', nickname, userId, avatar, comment, id: eventId }
     }
     if (kind === 'gift') {
       const giftName = asText(pick(outer, ['giftName', 'gift_name', 'name', 'gift']) ?? pick(obj, ['giftName', 'gift_name', 'name']) ?? 'Quà tặng')
       const value = Number(pick(outer, ['diamondCount', 'diamond_count', 'diamonds', 'value', 'coins', 'price', 'cost']) ?? pick(obj, ['diamondCount', 'diamonds', 'value', 'coins', 'price']) ?? 1) || 1
       const repeatCount = Number(pick(outer, ['repeatCount', 'repeat_count', 'count', 'repeatEnd']) ?? pick(obj, ['repeatCount', 'count']) ?? 1) || 1
       const text = asText(pick(outer, ['comment', 'text', 'message', 'content']) ?? pick(obj, ['comment', 'text', 'message']) ?? '')
-      return { kind: 'gift', nickname, userId, giftName, value, repeatCount, text, id: eventId }
+      return { kind: 'gift', nickname, userId, avatar, giftName, value, repeatCount, text, id: eventId }
     }
     if (kind === 'like') {
       const likeCount = Number(pick(outer, ['likeCount', 'like_count', 'count']) ?? pick(obj, ['likeCount', 'count']) ?? 1) || 1
       const total = Number(pick(outer, ['totalLikeCount', 'total_like_count', 'totalLikes', 'total_likes', 'total']) ?? pick(obj, ['totalLikeCount', 'totalLikes', 'total'])) || null
-      return { kind: 'like', nickname, userId, likeCount, total, id: eventId }
+      return { kind: 'like', nickname, userId, avatar, likeCount, total, id: eventId }
     }
-    return { kind, nickname, userId, id: eventId }
+    return { kind, nickname, userId, avatar, id: eventId }
   } catch (e) {
     return { kind: 'unknown', reason: 'parse-error: ' + e.message, raw: asText(rawInput).slice(0, 200) }
   }

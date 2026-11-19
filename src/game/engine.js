@@ -2,65 +2,82 @@
 // Logic thuần của game kéo co 2 đội trên TikTok LIVE. KHÔNG dùng React/Three/DOM
 // nên chạy được trực tiếp bằng `node tests/tug.test.js`.
 // Thời gian trong engine tính bằng giây (state.now).
-// Luật chơi: 2 đội kéo 1 sợi dây qua hố bùn ở giữa. Quà tặng = lực kéo cho
-// đội của người tặng (quà càng nhiều xu kéo càng mạnh). Thả tim = tiếp sức
-// cho đội đang thua. Đội nào kéo dây qua vạch của mình (hoặc dẫn trước khi
-// hết giờ) thì thắng màn. Thắng 3 màn trước thì thắng trận.
+// LUẬT CHƠI (v2 — số đông vs tiền quà, tim = thời gian):
+// · Mỗi người bình luận A/B vào đội là +1 lực kéo LIÊN TỤC cho đội đó —
+//   đội đông người kéo mạnh hơn, 100 người thì đội 1 người chắc chắn thua.
+// · Quà tặng là cú BÙNG sức mạnh (tắt dần sau vài giây): hạc giấy 99 xu =
+//   100 lực, bằng 100 người — 1 món quà to đủ để kéo ngang đội đông.
+// · Thả tim KHÔNG kéo dây nữa: 1 người thả đủ 100 tim thì màn kéo dài
+//   thêm 10 giây (tối đa +60 giây/màn).
+// · Đội thua quá nửa đường được ×2 (cơ hội cuối); 10 giây cuối quà ×2
+//   (giờ chót). Thắng 2 màn trước thì vô địch trận (best of 3 — tối đa 3
+//   màn, 2–1 là vô địch), chuỗi thắng giữ qua trận.
 
-// ─── Thú + đội ─────────────────────────────────────────────────────────────
-export const PET_TYPES = [
-  { id: 'cat',     name: 'Mèo Mun',   color: '#ff9f43', wobble: 0.9 },
-  { id: 'dog',     name: 'Chó Vàng',  color: '#b08954', wobble: 1.1 },
-  { id: 'rabbit',  name: 'Thỏ Trắng', color: '#f5f0ff', wobble: 1.6 },
-  { id: 'beaver',  name: 'Hải Ly',    color: '#e8a04c', wobble: 0.7 },
-  { id: 'duck',    name: 'Vịt Con',   color: '#ffd60a', wobble: 1.2 },
-  { id: 'panda',   name: 'Gấu Trúc',  color: '#e8e8e8', wobble: 0.8 },
+// ─── Người chơi + đội ───────────────────────────────────────────────────────
+// 6 người thật (model 3D): Đội Đỏ = Anh Hùng (lính), Kaito (võ sĩ), Mia;
+// Đội Xanh = Lan, Hương (2 chị em), Bình (lính). Bình luận tên người để
+// vào đội của người đó.
+export const MEMBER_TYPES = [
+  { id: 'soldier',  name: 'Anh Hùng', color: '#8a9a5b', wobble: 0.9 },
+  { id: 'player',   name: 'Miyo',     color: '#5b7a8a', wobble: 1.1 },
+  { id: 'michelle', name: 'Mia',      color: '#e8a0b4', wobble: 1.6 },
+  { id: 'casual',   name: 'Lan',      color: '#e8a04c', wobble: 0.7 },
+  { id: 'casual2',  name: 'Hương',    color: '#b48ae8', wobble: 1.2 },
+  { id: 'soldierB', name: 'Bình',     color: '#8a8a8a', wobble: 0.8 },
 ]
-export const PET_BY_ID = Object.fromEntries(PET_TYPES.map((p) => [p.id, p]))
+export const MEMBER_BY_ID = Object.fromEntries(MEMBER_TYPES.map((p) => [p.id, p]))
 
 export const TEAMS = {
-  A: { id: 'A', name: 'Đội Đỏ',  short: 'ĐỎ',  color: '#e03131', emoji: '🔴', pets: ['cat', 'dog', 'rabbit'] },
-  B: { id: 'B', name: 'Đội Xanh', short: 'XANH', color: '#1971c2', emoji: '🔵', pets: ['beaver', 'duck', 'panda'] },
+  A: { id: 'A', name: 'Đội Đỏ',  short: 'ĐỎ',  color: '#e03131', emoji: '🔴', members: ['soldier', 'player', 'michelle'] },
+  B: { id: 'B', name: 'Đội Xanh', short: 'XANH', color: '#1971c2', emoji: '🔵', members: ['casual', 'casual2', 'soldierB'] },
 }
 export const TEAM_IDS = ['A', 'B']
-export function teamOfPet(petId) {
-  return TEAMS.A.pets.includes(petId) ? 'A' : 'B'
+export function teamOfMember(memberId) {
+  return TEAMS.A.members.includes(memberId) ? 'A' : 'B'
 }
 export function otherTeam(teamId) { return teamId === 'A' ? 'B' : 'A' }
 
 // ─── Quà TikTok → lực kéo ──────────────────────────────────────────────────
-// Giá xu thật (bảng quà TikTok, chỉ quà dưới 100 xu). Xu càng cao kéo càng
-// mạnh: 1 xu = 1, 5 xu = 3, 10 xu = 6, 20 xu = 12, 99 xu = 30 lực kéo.
+// Giá xu thật (bảng quà TikTok, chỉ quà dưới 100 xu). Quà là cú bùng sức
+// mạnh — 1 món quà to bằng cả đám đông: 99 xu = 100 lực = 100 người.
+// 1 xu = 1, 5 xu = 5, 10 xu = 10, 20 xu = 25, 99 xu = 100 lực kéo.
 export const DEFAULT_GIFT_MAP = {
-  // 1 xu → kéo nhẹ
+  // 1 xu → bùng nhẹ
   'hoa hồng': 1, rose: 1,
   'kem ốc quế': 1, 'ice cream': 1,
   'nhịp trống mirwas': 1, mirwas: 1,
   'nhạc tự do': 1, 'nhạc xưa': 1, 'thả tim cho tôi': 1, 'tiktok': 1, 'đỉnh': 1, 'gg': 1,
-  // 5 xu → kéo vừa
-  'bing chilling': 3,
-  'quả đào': 3, peach: 3,
-  'phản ứng quá lố': 3, 'trái bóng xoáy': 3, 'bắn tim': 3, 'finger heart': 3, 'ok': 3,
-  // 10 xu → kéo mạnh
-  'rosa': 6,
-  'cỏ bốn lá': 6, 'four-leaf clover': 6, clover: 6,
-  // 20 xu → kéo rất mạnh
-  'nước hoa': 12, perfume: 12,
-  'little kisses': 12,
-  // 99 xu → kéo cực mạnh
-  'hạc giấy': 30, 'paper crane': 30,
+  // 5 xu → bùng vừa
+  'bing chilling': 5,
+  'quả đào': 5, peach: 5,
+  'phản ứng quá lố': 5, 'trái bóng xoáy': 5, 'bắn tim': 5, 'finger heart': 5, 'ok': 5,
+  // 10 xu → bùng mạnh
+  'rosa': 10,
+  'cỏ bốn lá': 10, 'four-leaf clover': 10, clover: 10,
+  // 20 xu → bùng rất mạnh
+  'nước hoa': 25, perfume: 25,
+  'little kisses': 25,
+  // 99 xu → bùng cực mạnh = 100 người
+  'hạc giấy': 100, 'paper crane': 100,
 }
 
 // Quà cũ (bản đua thú) lưu chiêu dạng chữ ('banana', 'ice'...) — đổi sang lực
 // kéo tương đương để cài đặt cũ của streamer không bị hỏng.
 const OLD_ABILITY_POWER = {
-  banana: 1, ice: 3, glove: 6, net: 6, melon: 12, heal: 12,
-  dizzy: 30, rocket: 6, shield: 6, magnet: 6,
+  banana: 1, ice: 5, glove: 10, net: 10, melon: 25, heal: 25,
+  dizzy: 100, rocket: 10, shield: 10, magnet: 10,
 }
+// Bảng lực kéo đổi v2 (2026-11-19): 1/3/6/12/30 → 1/5/10/25/100. Cài đặt
+// cũ trên máy streamer còn lưu giá trị mặc định cũ thì đổi sang giá trị
+// mới; quà nào chỉnh tay khác giá trị cũ thì giữ nguyên.
+const OLD_TO_NEW_POWER = { 3: 5, 6: 10, 12: 25, 30: 100 }
 export function migrateGiftMap(map) {
   const out = {}
   for (const [k, v] of Object.entries(map || {})) {
-    if (typeof v === 'number') out[k] = v
+    if (typeof v === 'number') {
+      const isDefaultGift = DEFAULT_GIFT_MAP[k] != null
+      out[k] = isDefaultGift && OLD_TO_NEW_POWER[v] != null ? OLD_TO_NEW_POWER[v] : v
+    }
     else if (typeof v === 'string' && OLD_ABILITY_POWER[v] != null) out[k] = OLD_ABILITY_POWER[v]
     else if (typeof v === 'string') out[k] = 1
   }
@@ -133,33 +150,41 @@ export function giftTier(coins) {
   if (coins == null) return ''
   if (coins <= 1) return 'Kéo nhẹ'
   if (coins <= 5) return 'Kéo vừa'
-  if (coins <= 20) return 'Kéo mạnh'
+  if (coins <= 10) return 'Kéo mạnh'
+  if (coins <= 20) return 'Kéo rất mạnh'
   return 'Kéo cực mạnh'
 }
 
 // ─── Cài đặt mặc định (Admin sửa được) ─────────────────────────────────────
 export const DEFAULT_SETTINGS = {
-  roundSeconds: 45,          // 1 màn kéo tối đa 45 giây
+  roundSeconds: 45,          // 1 màn kéo tối đa 45 giây (chưa tính tim cộng thêm)
   countdownSeconds: 3,
-  winsToMatch: 3,            // thắng 3 màn trước thì thắng trận
+  winsToMatch: 2,            // thắng 2 màn trước thì thắng trận (best of 3 — tối đa 3 màn)
   winLine: 0.9,              // dây chạm ±0,9 là thắng màn ngay
-  pullK: 0.02,               // 1 lực kéo = dây nhích 0,02 (quà 1 xu)
-  ropeDecay: 0.04,           // dây tự trôi về giữa 4%/giây — phải tặng liên tục mới thắng
+  ropeSpeed: 0.12,           // tốc độ dây tối đa — 1 đội áp đảo hoàn toàn thì dây chạy 0,12/giây
+  ropeDecay: 0.02,           // dây tự trôi nhẹ về giữa 2%/giây
+  boostDecay: 0.2,           // quà tặng tắt dần — bùng lực giảm một nửa sau ~3,5 giây
   comebackAt: 0.55,          // đội thua quá 0,55 thì vào "cơ hội cuối"
   comebackMult: 2,           // ... quà của đội thua nhân đôi lực kéo
   globalPullIntervalSec: 0.5, // tối đa 1 lượt kéo / 0,5 giây toàn trận (còn lại xếp hàng)
-  likeBoostEvery: 100,       // mỗi 100 tim → tiếp sức đội đang thua
-  likeBoostPower: 0.06,      // ... đẩy dây 0,06 về phía đội thua
+  likeTimeEvery: 100,        // 1 người thả đủ 100 tim → +thời gian kéo
+  likeTimeSeconds: 10,       // ... +10 giây
+  likeTimeMaxBonus: 60,      // ... tối đa +60 giây / màn
+  finalSeconds: 10,          // 10 giây cuối là "giờ chót"
+  finalGiftMult: 2,          // ... quà tặng trong giờ chót nhân đôi lực kéo
   giftMap: { ...DEFAULT_GIFT_MAP },
   streamerId: '',
   soundOn: true,
 }
 
 export const BALANCE_NOTE =
-  'Cân bằng: dây tự trôi về giữa nên một món quà không quyết định được màn — ' +
-  'phải tặng liên tục mới kéo đối thủ xuống bùn. Đội đang thua được nhân đôi ' +
-  'lực kéo (cơ hội cuối) và tim khán giả cũng tiếp sức cho đội thua, nên màn ' +
-  'nào cũng có thể lật kèo vào phút chót.'
+  'Cân bằng: mỗi người vào đội là +1 lực kéo liên tục — đội đông người ' +
+  'kéo mạnh hơn, 100 người thì đội 1 người chắc chắn thua. Quà tặng là cú ' +
+  'bùng sức mạnh (tắt dần sau vài giây): hạc giấy 99 xu = 100 lực, bằng ' +
+  '100 người — 1 món quà to đủ để kéo ngang đội đông. Tim không kéo dây ' +
+  'nữa: 1 người thả đủ 100 tim thì màn kéo dài thêm 10 giây (tối đa +60 ' +
+  'giây/màn). 10 giây cuối quà ×2, đội thua quá nửa đường cũng ×2 (cơ hội ' +
+  'cuối), nên màn nào cũng có thể lật kèo vào phút chót.'
 
 // ─── Trạng thái trận đấu ────────────────────────────────────────────────────
 let uidCounter = 1
@@ -168,9 +193,16 @@ export function nextId(prefix = 'id') { return `${prefix}_${Date.now().toString(
 export function makeTeamState(teamId) {
   return {
     id: teamId, members: [], totalPull: 0, roundWins: 0,
-    pullRate: 0, // tốc độ kéo gần đây (cho 3D nghiêng người) — tự giảm dần
+    boost: 0, // lực bùng từ quà tặng — tắt dần theo boostDecay
+    pullRate: 0, // sức mạnh hiện tại = số người + bùng quà (cho 3D nghiêng người)
     lastPullAt: -999,
   }
+}
+
+// Sức mạnh đội = số người (mỗi người +1, kéo liên tục) + bùng quà (tắt dần).
+export function teamStrength(state, teamId) {
+  const team = state.teams[teamId]
+  return team.members.length + team.boost
 }
 
 export function createMatch(settings = DEFAULT_SETTINGS) {
@@ -181,14 +213,72 @@ export function createMatch(settings = DEFAULT_SETTINGS) {
     teams: { A: makeTeamState('A'), B: makeTeamState('B') },
     round: 1, roundWinner: null, matchWinner: null,
     luckyStar: null, // { team } — đội thắng màn trước được bắt đầu màn sau lệch 0,12 về phía mình
+    streak: { A: 0, B: 0 }, // chuỗi thắng trận liên tiếp của mỗi đội (giữ qua trận)
     feed: [], floaters: [], effects: [],
-    likes: 0, likeAcc: 0, nextRoundIn: 0, matchEndIn: 0,
+    likes: 0, likeByUser: {}, timeAddedByLikes: 0, finalTime: false,
+    // BXH (lưu lại qua các màn/trận — chỉ xóa khi streamer bấm Xóa BXH):
+    // giftTotals: userId → { nickname, power, coins, count, avatar }
+    // likeTotals: userId → { nickname, likes, avatar }
+    giftTotals: {}, likeTotals: {},
+    nextRoundIn: 0, matchEndIn: 0,
     settings: { ...settings },
     stats: { gifts: 0, pulls: 0 },
   }
 }
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
+
+// ─── BXH: ai tặng quà nhiều nhất / thả tim nhiều nhất ──────────────────────
+// Tính theo TỔNG CẢ PHIÊN (không tính lại theo màn) để bảng nhỏ ở góc trái
+// màn hình luôn có người đứng đầu. Lưu lại bằng localStorage ở màn hiển
+// thị (xem useTugOfWar) nên tải lại trang vẫn còn.
+export function recordGift(state, userId, nickname, power, coins = 0, avatar = '') {
+  const uid = userId || 'anon'
+  const cur = state.giftTotals[uid] || { nickname: nickname || uid, power: 0, coins: 0, count: 0, avatar: avatar || '' }
+  cur.nickname = nickname || cur.nickname
+  if (avatar) cur.avatar = avatar
+  cur.power += power || 0
+  cur.coins += coins || 0
+  cur.count += 1
+  state.giftTotals[uid] = cur
+  return cur
+}
+export function recordLike(state, userId, nickname, count, avatar = '') {
+  const uid = userId || 'anon'
+  const cur = state.likeTotals[uid] || { nickname: nickname || uid, likes: 0, avatar: avatar || '' }
+  cur.nickname = nickname || cur.nickname
+  if (avatar) cur.avatar = avatar
+  cur.likes += count || 0
+  state.likeTotals[uid] = cur
+  return cur
+}
+// Top N người tặng quà nhiều nhất (theo tổng lực kéo từ quà).
+export function topGifters(state, n = 3) {
+  return Object.values(state.giftTotals || {})
+    .sort((a, b) => b.power - a.power)
+    .slice(0, n)
+}
+// Top N người thả tim nhiều nhất (theo tổng tim).
+export function topLikers(state, n = 3) {
+  return Object.values(state.likeTotals || {})
+    .sort((a, b) => b.likes - a.likes)
+    .slice(0, n)
+}
+// Xóa BXH (streamer bấm ở Admin khi bắt đầu live mới).
+export function clearBxh(state) {
+  state.giftTotals = {}
+  state.likeTotals = {}
+}
+
+// ─── Toast: có ai vào xem / theo dõi / chia sẻ thì hiện 2 giây rồi mất ────
+// Chỉ giữ 1 toast: ai vào sau thì đổi chữ + tính lại 2 giây (không xếp chồng).
+export function pushToast(state, text) {
+  const cur = state.effects.find((e) => e.kind === 'toast')
+  if (cur) { cur.text = text; cur.t = 0; return cur }
+  const fx = { id: nextId('fx'), kind: 'toast', text, t: 0, dur: 2 }
+  state.effects.push(fx)
+  return fx
+}
 
 export function pushFeed(state, kind, text) {
   state.feed.push({ id: nextId('feed'), kind, text, at: state.now })
@@ -200,8 +290,9 @@ export function pushFloater(state, teamId, text) {
 }
 
 // ─── Vào đội ───────────────────────────────────────────────────────────────
-// Bình luận "A" / "ĐỎ" → Đội Đỏ; "B" / "XANH" → Đội Xanh; tên thú → đội của
-// thú đó; "THAM GIA" / "JOIN" → đội đang ít người hơn (cho cân).
+// Bình luận "A" / "ĐỎ" → Đội Đỏ; "B" / "XANH" → Đội Xanh; tên người → đội của
+// người đó (Miyo / Anh Hùng / Mia = Đỏ; Lan / Hương / Bình = Xanh);
+// "THAM GIA" / "JOIN" → đội đang ít người hơn (cho cân).
 export function parseTeamJoin(comment) {
   if (!comment) return null
   const flat = String(comment).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D')
@@ -216,16 +307,16 @@ export function parseTeamJoin(comment) {
   if ((has('DOI') || has('TEAM') || has('NHOM')) && has('A')) return 'A'
   if ((has('DOI') || has('TEAM') || has('NHOM')) && has('B')) return 'B'
   // Còn lại chỉ tính khi bình luận ngắn (≤2 từ) — tránh nhận nhầm câu thường
-  // như "cho em hỏi" (chữ CHO trùng tên Chó) hay "a ơi" (chữ A).
+  // như "lan man" hay "a ơi" (chữ A).
   if (tokens.length > 2) return null
   if (has('XANH', 'B', 'BLUE')) return 'B'
   if (has('DO', 'A', 'RED')) return 'A'
-  if (has('MEO', 'CHO', 'THO', 'CAT', 'DOG', 'RABBIT', 'BUNNY')) return 'A'
-  if (has('HAI', 'HAILY', 'VIT', 'GAU', 'BEAVER', 'DUCK', 'PANDA')) return 'B'
+  if (has('MIYO', 'MIA') || flat === 'ANH HUNG') return 'A'
+  if (has('LAN', 'HUONG', 'BINH')) return 'B'
   return null
 }
 
-export function joinTeam(state, teamId, nickname, userId) {
+export function joinTeam(state, teamId, nickname, userId, avatar = '') {
   if (teamId === 'balance') {
     teamId = state.teams.A.members.length <= state.teams.B.members.length ? 'A' : 'B'
   }
@@ -234,10 +325,19 @@ export function joinTeam(state, teamId, nickname, userId) {
   if (userId && findMember(state, userId)) return { ok: false, reason: 'already', teamId: findMember(state, userId).teamId }
   const team = state.teams[teamId]
   if (team.members.length >= 100) return { ok: false, reason: 'full', teamId }
-  const member = { nickname, userId: userId || '', teamId, pulls: 0, gifts: 0 }
+  // Mỗi người vào đội là 1 nhân vật hiện ra trên sân kéo dây (+1 lực kéo).
+  // Lưu avatar (ảnh đại diện TikTok, nếu có) + lúc vào đội để 3D xếp hàng.
+  const member = { nickname, userId: userId || '', avatar: avatar || '', teamId, pulls: 0, gifts: 0, joinedAt: state.now }
   team.members.push(member)
   pushFeed(state, 'join', `${TEAMS[teamId].emoji} ${nickname} vào ${TEAMS[teamId].name}!`)
   return { ok: true, teamId, member }
+}
+
+// Những thành viên HIỆN RA trên sân 3D (mới vào gần nhất, tối đa cap
+// người/đội — sân không chứa nổi 100 người, còn lại chỉ tính lực kéo).
+export function visibleMembers(state, teamId, cap = 3) {
+  const members = state.teams[teamId]?.members || []
+  return members.slice(-cap)
 }
 
 export function findMember(state, userId) {
@@ -262,63 +362,89 @@ export function giftTeam(state, userId, textHint) {
 }
 
 // ─── Lực kéo ───────────────────────────────────────────────────────────────
-// Quà to kéo mạnh nhưng có giới hạn: trên 10 lực thì phần vượt chỉ tính một
-// nửa, tối đa 20 lực / 1 món — 1 con hạc giấy không thể thắng màn trong 1 nốt.
-export function pullEffect(power) {
-  let e = power <= 10 ? power : 10 + (power - 10) * 0.5
-  return Math.min(20, Math.max(0, e))
+// Quà tặng là cú bùng sức mạnh: tối đa 100 lực / 1 món — 1 con hạc giấy
+// (99 xu) bằng 100 người, nhưng bùng lực tắt dần sau vài giây nên đội đông
+// vẫn thắng về lâu dài nếu không có quà tiếp.
+export function giftBoost(power) {
+  return Math.min(100, Math.max(0, power || 0))
 }
 
-export function applyPull(state, teamId, power, sender = {}) {
+export function applyPull(state, teamId, power, sender = {}, giftName = '', opts = {}) {
   const now = state.now
   if (state.phase !== 'pulling') return { ok: false, blocked: 'not-pulling' }
   if (teamId !== 'A' && teamId !== 'B') return { ok: false, blocked: 'no-team' }
   const team = state.teams[teamId]
-  const dir = teamId === 'A' ? 1 : -1
   // Cơ hội cuối: đội đang thua quá vạch thì quà nhân đôi lực kéo.
   const losing = (teamId === 'A' && state.rope < -state.settings.comebackAt)
     || (teamId === 'B' && state.rope > state.settings.comebackAt)
-  const effect = pullEffect(power) * (losing ? state.settings.comebackMult : 1)
-  state.rope = clamp(state.rope + dir * effect * state.settings.pullK, -1, 1)
+  // Giờ chót: 10 giây cuối quà nhân đôi — kéo quà tặng về phút chót.
+  const final = state.roundTimeLeft <= (state.settings.finalSeconds ?? 10)
+  let effect = giftBoost(power)
+  if (losing) effect *= state.settings.comebackMult
+  if (final) effect *= state.settings.finalGiftMult ?? 2
+  team.boost += effect
+  team.pullRate = team.members.length + team.boost
   team.totalPull += effect
-  team.pullRate += effect
   team.lastPullAt = now
   const member = findMember(state, sender.userId)
   if (member) { member.pulls += effect; member.gifts += 1 }
   state.stats.pulls++
   state.stats.gifts++
+  // BXH: ghi tổng quà của người tặng (tính cả khi chưa vào đội).
+  // Chỉ ghi khi đây là quà THẬT (opts.gift !== false) — lượt kéo thử
+  // (Admin/demo) không phải quà nên không lên BXH.
   const senderName = sender.nickname || 'Khán giả'
-  const big = effect >= 12
+  if (opts.gift !== false) {
+    const coins = giftPrice(giftName) ?? 0
+    recordGift(state, sender.userId, senderName, effect, coins, sender.avatar || '')
+  }
+  // LẬT KÈO: 1 món quà mạnh hơn cả số người đội kia — khoảnh khắc "cá voi
+  // cân cả đám đông", hiện to trên màn hình.
+  const otherBase = state.teams[otherTeam(teamId)].members.length
+  const flip = effect > otherBase && otherBase > 0
+  const big = effect >= 25
   pushFeed(state, 'pull',
-    `${TEAMS[teamId].emoji} ${senderName} kéo ${big ? 'CỰC MẠNH' : 'một phát'} cho ${TEAMS[teamId].name}!${losing ? ' (cơ hội cuối ×2)' : ''}`)
+    `${TEAMS[teamId].emoji} ${senderName} kéo ${big ? 'CỰC MẠNH' : 'một phát'} cho ${TEAMS[teamId].name}!${losing ? ' (cơ hội cuối ×2)' : ''}${final ? ' (giờ chót ×2)' : ''}${flip ? ' 🌊 LẬT KÈO!' : ''}`)
   pushFloater(state, teamId, big ? '💪 KÉO CỰC MẠNH!' : '💪 +KÉO!')
   state.effects.push({ id: nextId('fx'), kind: 'pull', team: teamId, t: 0, dur: 0.6 })
-  return { ok: true, teamId, effect, comeback: losing }
+  if (flip) state.effects.push({ id: nextId('fx'), kind: 'flip', team: teamId, sender: senderName, t: 0, dur: 2.5 })
+  // Hiệu ứng tặng quà (đỉnh của chóp): quà nhỏ = hộp quà mở ra + hiện tên;
+  // quà to (≥25 lực) = nổ pháo hoa + tên người tặng hiện nổi bật.
+  // opts.gift === false thì không hiện (lượt kéo thử / demo, không phải quà).
+  if (opts.gift !== false) {
+    state.effects.push({
+      id: nextId('fx'), kind: 'gift', team: teamId,
+      sender: senderName, gift: giftName || '', icon: giftIcon(giftName),
+      power: effect, big, t: 0, dur: big ? 3.5 : 2,
+    })
+  }
+  return { ok: true, teamId, effect, comeback: losing, final, flip }
 }
 
-// Thả tim: đủ 100 tim thì tiếp sức cho đội đang thua (đẩy dây về phía họ).
-export function applyLikeBoost(state, count) {
-  state.likes += count
-  const every = state.settings.likeBoostEvery || 100
-  let boosted = 0
-  while (state.likeAcc + count >= every) {
-    count -= (every - state.likeAcc)
-    state.likeAcc = 0
-    boosted++
+// Thả tim: KHÔNG kéo dây nữa — chỉ +thời gian kéo. 1 người thả đủ 100 tim
+// thì màn kéo dài thêm 10 giây (tối đa +60 giây/màn). Tính theo từng
+// người (không cộng dồn cả phòng) để 1 người thả 100 tim mới tính.
+// BXH tim tính TỔNG CẢ PHIÊN (ghi cả khi chưa vào màn kéo) để bảng nhỏ
+// ở góc trái luôn có người đứng đầu.
+export function applyLikes(state, userId, count, nickname = '', avatar = '') {
+  state.likes += count || 0
+  recordLike(state, userId, nickname || userId || 'Khán giả', count || 0, avatar)
+  if (state.phase !== 'pulling') return 0
+  const every = state.settings.likeTimeEvery || 100
+  const per = state.settings.likeTimeSeconds || 10
+  const maxBonus = state.settings.likeTimeMaxBonus ?? 60
+  const uid = userId || 'anon'
+  state.likeByUser[uid] = (state.likeByUser[uid] || 0) + (count || 0)
+  let added = 0
+  while (state.likeByUser[uid] >= every && state.timeAddedByLikes < maxBonus) {
+    state.likeByUser[uid] -= every
+    state.roundTimeLeft += per
+    state.timeAddedByLikes += per
+    added++
+    pushFeed(state, 'like', `❤️ Đủ ${every} tim: +${per}s kéo co!`)
+    state.effects.push({ id: nextId('fx'), kind: 'time', team: null, t: 0, dur: 1.5 })
   }
-  state.likeAcc += count
-  let applied = 0
-  for (let i = 0; i < boosted; i++) {
-    if (state.phase !== 'pulling') continue
-    const losingTeam = state.rope > 0.05 ? 'B' : state.rope < -0.05 ? 'A' : null
-    if (!losingTeam) continue
-    const dir = losingTeam === 'A' ? 1 : -1
-    state.rope = clamp(state.rope + dir * state.settings.likeBoostPower, -1, 1)
-    state.teams[losingTeam].pullRate += 2
-    applied++
-    pushFeed(state, 'like', `❤️ Đủ ${every} tim: ${TEAMS[losingTeam].name} được tiếp sức!`)
-  }
-  return applied
+  return added
 }
 
 // ─── Màn / trận ────────────────────────────────────────────────────────────
@@ -345,6 +471,15 @@ export function startRound(state) {
   state.countdown = state.settings.countdownSeconds
   state.roundTimeLeft = state.settings.roundSeconds
   state.effects = []
+  // Màn mới: bùng quà tắt hết, tim tính lại từ đầu (mỗi màn 1 cuộc đua mới).
+  // Thành viên trong đội GIỮ NGUYÊN qua các màn (cùng 1 khán phòng).
+  for (const t of TEAM_IDS) {
+    state.teams[t].boost = 0
+    state.teams[t].pullRate = state.teams[t].members.length
+  }
+  state.likeByUser = {}
+  state.timeAddedByLikes = 0
+  state.finalTime = false
   pushFeed(state, 'info', `🏁 Màn ${state.round} — chuẩn bị… 3 — 2 — 1!`)
 }
 
@@ -366,8 +501,11 @@ export function endRound(state, winnerTeamId) {
     state.phase = 'matchEnd'
     state.matchWinner = winnerTeamId
     state.matchEndIn = 15
+    // Chuỗi thắng trận liên tiếp — đội thắng +1, đội thua về 0.
+    state.streak[winnerTeamId] = (state.streak[winnerTeamId] || 0) + 1
+    state.streak[otherTeam(winnerTeamId)] = 0
     state.effects.push({ id: nextId('fx'), kind: 'confetti', team: winnerTeamId, t: 0, dur: 4 })
-    pushFeed(state, 'win', `🏆 ${winner.name} VÔ ĐỊCH TRẬN ĐẤU! (${state.teams.A.roundWins}–${state.teams.B.roundWins})`)
+    pushFeed(state, 'win', `🏆 ${winner.name} VÔ ĐỊCH TRẬN ĐẤU! (${state.teams.A.roundWins}–${state.teams.B.roundWins})${state.streak[winnerTeamId] > 1 ? ` · 🔥 Thắng ${state.streak[winnerTeamId]} trận liên tiếp!` : ''}`)
   }
 }
 
@@ -377,10 +515,6 @@ export function tick(state, dt) {
   state.now += dt
   state.floaters = state.floaters.filter((f) => state.now - f.at < 2.2)
   state.effects = state.effects.filter((e) => { e.t += dt; return e.t < e.dur })
-  for (const t of TEAM_IDS) {
-    // Tốc độ kéo gần đây giảm dần để 3D biết lúc nào thú đang gồng sức.
-    state.teams[t].pullRate *= Math.exp(-2.5 * dt)
-  }
 
   if (state.phase === 'countdown') {
     state.countdown -= dt
@@ -406,7 +540,22 @@ export function tick(state, dt) {
   if (state.phase !== 'pulling') return
 
   state.roundTimeLeft -= dt
-  // Dây tự trôi về giữa — phải tặng liên tục mới giữ được lợi thế.
+  state.finalTime = state.roundTimeLeft <= (state.settings.finalSeconds ?? 10)
+  // Sức mạnh đội = số người (kéo liên tục) + bùng quà (tắt dần).
+  for (const t of TEAM_IDS) {
+    const team = state.teams[t]
+    team.boost *= Math.exp(-state.settings.boostDecay * dt)
+    team.pullRate = team.members.length + team.boost
+  }
+  // Dây chạy theo CHÊNH LỆCH sức mạnh (tỉ lệ): đội mạnh gấp đôi thì dây
+  // chạy nhanh, 2 đội ngang nhau thì dây đứng yên — quà to hay đội đông
+  // đều thể hiện ngay bằng tốc độ dây.
+  const strA = state.teams.A.pullRate
+  const strB = state.teams.B.pullRate
+  const total = Math.max(1, strA + strB)
+  const diff = (strA - strB) / total
+  state.rope = clamp(state.rope + diff * state.settings.ropeSpeed * dt, -1, 1)
+  // Dây tự trôi nhẹ về giữa — không ai kéo thì lợi thế mất dần.
   state.rope *= Math.exp(-state.settings.ropeDecay * dt)
   if (Math.abs(state.rope) >= state.settings.winLine) {
     endRound(state, state.rope > 0 ? 'A' : 'B')
@@ -439,7 +588,7 @@ export function advance(state, dt) {
 export class GiftEngine {
   constructor(state, applyFn) {
     this.state = state
-    this.applyFn = applyFn || ((power, sender, teamId) => applyPull(state, teamId, power, sender))
+    this.applyFn = applyFn || ((power, sender, teamId, giftName) => applyPull(state, teamId, power, sender, giftName))
     this.seen = new Set()
     this.seenOrder = []
     this.queue = []
@@ -479,7 +628,7 @@ export class GiftEngine {
     const power = this.resolveGift(ev.giftName)
     if (power == null) { this.droppedUnmapped++; return { ok: false, reason: 'unmapped', giftName: ev.giftName } }
     const teamId = giftTeam(this.state, ev.userId, ev.text || '')
-    this.queue.push({ power, sender: { nickname: ev.nickname, userId: ev.userId }, teamId, at: this.state.now })
+    this.queue.push({ power, sender: { nickname: ev.nickname, userId: ev.userId, avatar: ev.avatar || '' }, teamId, giftName: ev.giftName, at: this.state.now })
     if (this.queue.length > 50) this.queue.shift() // hàng đợi đầy: bỏ lượt cũ nhất
     return { ok: true, queued: true, power, teamId }
   }
@@ -492,7 +641,7 @@ export class GiftEngine {
     if (now - this.lastProcessedAt < interval) return { ok: false, reason: 'rate-limited', queued: this.queue.length }
     const job = this.queue.shift()
     this.lastProcessedAt = now
-    const res = this.applyFn(job.power, job.sender, job.teamId)
+    const res = this.applyFn(job.power, job.sender, job.teamId, job.giftName)
     return { ...res, queued: this.queue.length }
   }
   get queueLength() { return this.queue.length }

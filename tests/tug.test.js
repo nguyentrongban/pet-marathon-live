@@ -1,12 +1,15 @@
 // ─── KÉO CO LIVE · tests/tug.test.js ───────────────────────────────────────
 // Test logic thuần (không cần framework): chạy bằng `node tests/tug.test.js`
 // hoặc `npm test`. Mỗi test là 1 hàm assert, in PASS/FAIL rồi tổng kết.
+// LUẬT v2: thành viên = +1 lực kéo liên tục · quà = bùng lực (99 xu = 100,
+// bằng 100 người, tắt dần) · tim = +thời gian (1 người đủ 100 tim → +10s).
 import assert from 'node:assert'
-import { createSeqTracker, parseCommand } from '../src/game/adapter.js'
+import { createSeqTracker, normalizeEvent, parseCommand } from '../src/game/adapter.js'
 import {
-  DEFAULT_SETTINGS, GiftEngine, PET_TYPES, TEAMS, advance, applyLikeBoost,
-  applyPull, createMatch, endRound, findMember, giftPrice, giftTier, giftTeam,
-  joinTeam, migrateGiftMap, parseTeamJoin, pullEffect, startMatch, startRound, tick,
+  DEFAULT_SETTINGS, GiftEngine, MEMBER_TYPES, TEAMS, advance, applyLikes,
+  applyPull, clearBxh, createMatch, endRound, findMember, giftBoost, giftPrice, giftTier,
+  giftTeam, joinTeam, migrateGiftMap, parseTeamJoin, pushToast, startMatch, startRound,
+  teamStrength, tick, topGifters, topLikers, visibleMembers,
 } from '../src/game/engine.js'
 
 let pass = 0, fail = 0
@@ -25,37 +28,85 @@ function freshMatch() {
   s.now = 10
   return s
 }
+function crowdMatch(aCount, bCount) {
+  const s = createMatch({ ...DEFAULT_SETTINGS, giftMap: { ...DEFAULT_SETTINGS.giftMap } })
+  for (let i = 0; i < aCount; i++) joinTeam(s, 'A', `A${i}`, `a${i}`)
+  for (let i = 0; i < bCount; i++) joinTeam(s, 'B', `B${i}`, `b${i}`)
+  startMatch(s)
+  s.phase = 'pulling'
+  s.roundTimeLeft = 45
+  s.now = 10
+  return s
+}
 function step(s, sec) { const n = Math.ceil(sec / 0.05); for (let i = 0; i < n; i++) tick(s, 0.05) }
 const approx = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps
 
-// ── 1. Quà = lực kéo ───────────────────────────────────────────────────────
-test('hoa hồng 1 xu kéo dây 0,02 về phía đội tặng', () => {
+// ── 1. Thành viên = lực kéo liên tục ───────────────────────────────────────
+test('mỗi người vào đội là +1 lực kéo liên tục', () => {
   const s = freshMatch()
-  const r = applyPull(s, 'A', 1, { nickname: 'Lan', userId: 'lan' })
-  assert.equal(r.ok, true)
-  assert.ok(approx(s.rope, 0.02), `dây phải ở 0,02, được ${s.rope}`)
-  assert.equal(s.teams.A.totalPull, 1)
+  assert.equal(teamStrength(s, 'A'), 1, '1 người = sức mạnh 1')
+  joinTeam(s, 'A', 'Hoa', 'hoa')
+  joinTeam(s, 'A', 'Mai', 'mai')
+  assert.equal(teamStrength(s, 'A'), 3, '3 người = sức mạnh 3')
+  assert.equal(teamStrength(s, 'B'), 1)
 })
 
-test('hạc giấy 99 xu kéo mạnh nhưng không thắng 1 nốt', () => {
-  const s = freshMatch()
-  assert.equal(pullEffect(30), 20, 'lực 30 phải giảm còn 20 (giới hạn 1 món)')
-  const r = applyPull(s, 'A', 30, { nickname: 'Lan', userId: 'lan' })
-  assert.equal(r.ok, true)
-  assert.ok(approx(s.rope, 0.4), `1 hạc giấy kéo 0,4, được ${s.rope}`)
-  assert.equal(s.phase, 'pulling', '1 món quà không được thắng màn ngay')
-  applyPull(s, 'A', 30, { nickname: 'Lan', userId: 'lan' })
-  assert.ok(approx(s.rope, 0.8), `2 hạc giấy kéo 0,8, được ${s.rope}`)
-  assert.equal(s.phase, 'pulling')
-  applyPull(s, 'A', 30, { nickname: 'Lan', userId: 'lan' })
-  // Vượt vạch 0,9 → tick mới chốt thắng (kiểm tra ở test thắng màn).
-  assert.ok(s.rope >= 0.9)
+test('đội đông người kéo thắng đội ít người (không cần quà)', () => {
+  const s = crowdMatch(10, 1)
+  step(s, 15)
+  assert.equal(s.phase, 'roundEnd', 'đội 10 người phải thắng màn')
+  assert.equal(s.roundWinner, 'A')
+  assert.equal(s.teams.A.roundWins, 1)
 })
 
-test('tặng liên tục mới thắng màn, dây không tự thắng', () => {
+test('không ai kéo thì dây đứng yên ở giữa (2 đội ngang nhau)', () => {
   const s = freshMatch()
-  step(s, 20)
-  assert.ok(approx(s.rope, 0), `không ai kéo thì dây ở giữa, được ${s.rope}`)
+  step(s, 5)
+  assert.ok(approx(s.rope, 0), `2 đội 1-1 thì dây ở giữa, được ${s.rope}`)
+})
+
+// ── 2. Quà = bùng lực, 99 xu = 100 người ───────────────────────────────────
+test('hạc giấy 99 xu = 100 lực, tối đa 100/món', () => {
+  assert.equal(giftBoost(100), 100)
+  assert.equal(giftBoost(150), 100, 'vượt 100 thì cắt còn 100')
+  assert.equal(giftBoost(1), 1)
+  assert.equal(giftBoost(25), 25)
+})
+
+test('quà tặng bùng lực rồi tắt dần sau vài giây', () => {
+  const s = freshMatch()
+  const r = applyPull(s, 'A', 100, { nickname: 'Lan', userId: 'lan' })
+  assert.equal(r.ok, true)
+  assert.equal(r.effect, 100)
+  assert.equal(s.teams.A.boost, 100)
+  assert.equal(s.teams.A.pullRate, 101, '1 người + 100 bùng = sức mạnh 101')
+  assert.ok(approx(s.rope, 0), 'quà không nhảy dây ngay — dây chạy theo tốc độ')
+  step(s, 5)
+  const b = s.teams.A.boost
+  assert.ok(b < 40 && b > 30, `sau 5s bùng phải còn ~37, được ${b}`)
+})
+
+test('1 món quà 100 lực kéo ngang 100 người', () => {
+  const s = crowdMatch(100, 1)
+  applyPull(s, 'B', 100, { nickname: 'B0', userId: 'b0' })
+  assert.equal(s.teams.B.pullRate, 101, '1 người + 100 bùng = 101, ngang 100 người')
+  assert.equal(s.teams.A.pullRate, 100)
+  step(s, 0.5)
+  assert.ok(Math.abs(s.rope) < 0.05, `2 đội ngang sức thì dây gần như đứng yên, được ${s.rope}`)
+})
+
+test('quà to bùng lên rồi tắt, đội đông thắng về lâu dài', () => {
+  const s = crowdMatch(100, 1)
+  applyPull(s, 'B', 100, { nickname: 'B0', userId: 'b0' })
+  let guard = 0
+  while (s.phase === 'pulling' && guard++ < 100) step(s, 1)
+  assert.equal(s.phase, 'roundEnd', 'hết bùng thì đội đông phải thắng màn')
+  assert.equal(s.roundWinner, 'A')
+  assert.equal(s.teams.A.roundWins, 1)
+})
+
+test('tặng liên tục mới thắng màn', () => {
+  const s = freshMatch()
   let guard = 0
   while (s.phase === 'pulling' && guard++ < 100) {
     applyPull(s, 'A', 1, { nickname: 'Lan', userId: 'lan' })
@@ -66,31 +117,66 @@ test('tặng liên tục mới thắng màn, dây không tự thắng', () => {
   assert.equal(s.teams.A.roundWins, 1)
 })
 
-// ── 2. Cơ hội cuối ×2 ──────────────────────────────────────────────────────
+// ── 3. Cơ hội cuối ×2 + giờ chót ×2 ────────────────────────────────────────
 test('đội đang thua quá 0,55 được nhân đôi lực kéo', () => {
   const s = freshMatch()
   s.rope = -0.7 // Đội Đỏ đang thua sâu
   const r = applyPull(s, 'A', 1, { nickname: 'Lan', userId: 'lan' })
   assert.equal(r.ok, true)
   assert.equal(r.comeback, true)
-  assert.ok(approx(s.rope, -0.66), `nhân đôi: dây phải lên -0,66, được ${s.rope}`)
+  assert.equal(r.effect, 2, '1 lực ×2 = 2')
+  assert.equal(s.teams.A.boost, 2)
   // Đội đang thắng thì không nhân đôi.
   const s2 = freshMatch()
   s2.rope = 0.3
   const r2 = applyPull(s2, 'A', 1, { nickname: 'Lan', userId: 'lan' })
   assert.equal(r2.comeback, false)
-  assert.ok(approx(s2.rope, 0.32))
+  assert.equal(r2.effect, 1)
 })
 
-// ── 3. Dây tự trôi về giữa ─────────────────────────────────────────────────
-test('dây tự trôi về giữa khi không ai kéo', () => {
+test('10 giây cuối quà tặng ×2 (giờ chót)', () => {
+  const s = freshMatch()
+  s.roundTimeLeft = 5
+  tick(s, 0.1)
+  assert.equal(s.finalTime, true, 'còn 5s phải vào giờ chót')
+  const r = applyPull(s, 'A', 10, { nickname: 'Lan', userId: 'lan' })
+  assert.equal(r.final, true)
+  assert.equal(r.effect, 20, '10 lực ×2 giờ chót = 20')
+  const s2 = freshMatch()
+  s2.roundTimeLeft = 20
+  const r2 = applyPull(s2, 'A', 10, { nickname: 'Lan', userId: 'lan' })
+  assert.equal(r2.final, false)
+  assert.equal(r2.effect, 10)
+  // Cơ hội cuối + giờ chót cộng dồn: 10 ×2 ×2 = 40.
+  const s3 = freshMatch()
+  s3.rope = -0.7
+  s3.roundTimeLeft = 5
+  const r3 = applyPull(s3, 'A', 10, { nickname: 'Lan', userId: 'lan' })
+  assert.equal(r3.effect, 40)
+  assert.equal(r3.comeback, true)
+  assert.equal(r3.final, true)
+})
+
+// ── 4. Lật kèo: 1 món quà mạnh hơn cả đội kia ──────────────────────────────
+test('1 món quà mạnh hơn số người đội kia thì lật kèo', () => {
+  const s = freshMatch() // B có 1 người
+  const r = applyPull(s, 'A', 10, { nickname: 'Lan', userId: 'lan' })
+  assert.equal(r.flip, true, '10 lực > 1 người đội Xanh → lật kèo')
+  assert.ok(s.effects.some((e) => e.kind === 'flip'), 'phải có hiệu ứng lật kèo')
+  const s2 = crowdMatch(1, 20) // B có 20 người
+  const r2 = applyPull(s2, 'A', 10, { nickname: 'Lan', userId: 'lan' })
+  assert.equal(r2.flip, false, '10 lực < 20 người → không lật kèo')
+})
+
+// ── 5. Dây tự trôi về giữa ─────────────────────────────────────────────────
+test('dây tự trôi nhẹ về giữa khi không ai kéo', () => {
   const s = freshMatch()
   s.rope = 0.5
   step(s, 10)
-  assert.ok(s.rope < 0.4 && s.rope > 0.25, `10 giây phải trôi về ~0,335, được ${s.rope}`)
+  assert.ok(s.rope < 0.45 && s.rope > 0.35, `10 giây phải trôi về ~0,41, được ${s.rope}`)
 })
 
-// ── 4. Hết giờ ─────────────────────────────────────────────────────────────
+// ── 6. Hết giờ ─────────────────────────────────────────────────────────────
 test('hết giờ: đội dẫn trước thắng, dây ở giữa thì hòa', () => {
   const s = freshMatch()
   s.rope = 0.3
@@ -106,38 +192,68 @@ test('hết giờ: đội dẫn trước thắng, dây ở giữa thì hòa', ()
   assert.equal(s2.roundWinner, null, 'dây gần giữa thì hòa')
 })
 
-// ── 5. Thả tim tiếp sức đội thua ───────────────────────────────────────────
-test('đủ 100 tim tiếp sức cho đội đang thua', () => {
+// ── 7. Thả tim = +thời gian (tính theo từng người) ─────────────────────────
+test('1 người đủ 100 tim thì màn kéo dài thêm 10 giây, tim không kéo dây', () => {
   const s = freshMatch()
-  s.rope = 0.4 // Xanh đang thua
-  const n = applyLikeBoost(s, 100)
+  s.rope = 0.4
+  const n = applyLikes(s, 'user1', 100)
   assert.equal(n, 1)
-  assert.ok(approx(s.rope, 0.34), `tiếp sức 0,06 về phía Xanh, được ${s.rope}`)
+  assert.ok(approx(s.roundTimeLeft, 55), `phải +10s thành 55, được ${s.roundTimeLeft}`)
+  assert.equal(s.timeAddedByLikes, 10)
   assert.equal(s.likes, 100)
-  const n2 = applyLikeBoost(s, 250)
-  assert.equal(n2, 2, '250 tim = 2 lần tiếp sức')
-  assert.ok(approx(s.rope, 0.22))
+  assert.ok(approx(s.rope, 0.4), 'tim không được đẩy dây')
+  const n2 = applyLikes(s, 'user1', 250)
+  assert.equal(n2, 2, '250 tim = 2 lần +10s, còn dư 50')
+  assert.ok(approx(s.roundTimeLeft, 75))
+  assert.equal(s.timeAddedByLikes, 30)
   assert.equal(s.likes, 350)
-  // Dây ở giữa thì tim không đẩy đi đâu.
-  const s2 = freshMatch()
-  s2.rope = 0
-  assert.equal(applyLikeBoost(s2, 100), 0)
+  const n3 = applyLikes(s, 'user1', 50)
+  assert.equal(n3, 1, '50 dư + 50 mới = đủ 100 → +10s nữa')
+  assert.ok(approx(s.roundTimeLeft, 85))
 })
 
-// ── 6. Vào đội ─────────────────────────────────────────────────────────────
-test('bình luận A/B/tên thú/THAM GIA vào đúng đội', () => {
+test('tim tính theo từng người, không cộng dồn cả phòng', () => {
+  const s = freshMatch()
+  assert.equal(applyLikes(s, 'user1', 60), 0, 'user1 mới 60 tim → chưa đủ')
+  assert.equal(applyLikes(s, 'user2', 60), 0, 'user2 mới 60 tim → chưa đủ')
+  assert.ok(approx(s.roundTimeLeft, 45), '2 người 60+60 không được cộng giờ')
+  assert.equal(s.likes, 120, 'tổng tim vẫn đếm')
+  assert.equal(applyLikes(s, 'user1', 40), 1, 'user1 đủ 60+40=100 → +10s')
+})
+
+test('tim cộng tối đa +60 giây / màn', () => {
+  const s = freshMatch()
+  const n = applyLikes(s, 'user1', 1000)
+  assert.equal(n, 6, '1000 tim = 10 lần nhưng cắt ở +60s (6 lần)')
+  assert.equal(s.timeAddedByLikes, 60)
+  assert.ok(approx(s.roundTimeLeft, 105))
+  assert.equal(applyLikes(s, 'user1', 500), 0, 'đủ +60s rồi thì tim nữa cũng không cộng')
+})
+
+test('tim ngoài lúc kéo không cộng giờ (nhưng vẫn đếm tổng)', () => {
+  const s = createMatch({ ...DEFAULT_SETTINGS, giftMap: { ...DEFAULT_SETTINGS.giftMap } })
+  startMatch(s) // đang đếm ngược, chưa kéo
+  assert.equal(s.phase, 'countdown')
+  assert.equal(applyLikes(s, 'user1', 100), 0)
+  assert.equal(s.likes, 100)
+  assert.ok(approx(s.roundTimeLeft, 45), 'chưa kéo thì không cộng giờ')
+})
+
+// ── 8. Vào đội ─────────────────────────────────────────────────────────────
+test('bình luận A/B/tên người/THAM GIA vào đúng đội', () => {
   assert.equal(parseTeamJoin('A'), 'A')
   assert.equal(parseTeamJoin('B'), 'B')
   assert.equal(parseTeamJoin('ĐỘI XANH'), 'B')
   assert.equal(parseTeamJoin('đội đỏ'), 'A')
-  assert.equal(parseTeamJoin('Mèo'), 'A')
-  assert.equal(parseTeamJoin('Chó'), 'A')
-  assert.equal(parseTeamJoin('Hải Ly'), 'B')
-  assert.equal(parseTeamJoin('Vịt'), 'B')
-  assert.equal(parseTeamJoin('Gấu'), 'B')
+  assert.equal(parseTeamJoin('Miyo'), 'A')
+  assert.equal(parseTeamJoin('Anh Hùng'), 'A')
+  assert.equal(parseTeamJoin('Mia'), 'A')
+  assert.equal(parseTeamJoin('Lan'), 'B')
+  assert.equal(parseTeamJoin('Hương'), 'B')
+  assert.equal(parseTeamJoin('Bình'), 'B')
   assert.equal(parseTeamJoin('THAM GIA'), 'balance')
   assert.equal(parseTeamJoin('@A'), 'A')
-  assert.equal(parseTeamJoin('cho em hỏi'), null, '"cho em hỏi" không được nhận nhầm là Chó')
+  assert.equal(parseTeamJoin('cho em hỏi'), null, 'câu thường không được nhận nhầm là vào đội')
   assert.equal(parseTeamJoin('hello mọi người'), null)
 })
 
@@ -151,7 +267,36 @@ test('vào đội: 1 người chỉ 1 đội, THAM GIA vào đội ít người 
   assert.equal(findMember(s, 'minh').teamId, 'B')
 })
 
-// ── 7. Quà kéo cho đội nào ─────────────────────────────────────────────────
+// ── 9. Quà kéo cho đội nào ─────────────────────────────────────────────────
+// ── 6b. Nhân vật khán giả: tên + avatar trên đầu, mới nhất hiện ra ──────
+test('vào đội lưu avatar + lúc vào để 3D hiện nhân vật của người đó', () => {
+  const s = createMatch({ ...DEFAULT_SETTINGS })
+  const r = joinTeam(s, 'A', 'Lan', 'lan', 'https://cdn.example.com/lan.jpg')
+  assert.equal(r.ok, true)
+  assert.equal(r.member.avatar, 'https://cdn.example.com/lan.jpg')
+  assert.equal(typeof r.member.joinedAt, 'number')
+  assert.equal(teamStrength(s, 'A'), 1, '1 nhân vật = +1 lực kéo')
+})
+test('chỉ 3 người mới nhất/đội hiện ra trên sân (còn lại vẫn tính lực)', () => {
+  const s = crowdMatch(5, 0)
+  const vis = visibleMembers(s, 'A', 3)
+  assert.equal(vis.length, 3)
+  assert.deepEqual(vis.map((m) => m.nickname), ['A2', 'A3', 'A4'], 'mới nhất 3 người')
+  assert.equal(teamStrength(s, 'A'), 5, 'cả 5 người đều tính lực kéo')
+  assert.equal(visibleMembers(s, 'A', 3).length, 3)
+  assert.equal(visibleMembers(s, 'B', 3).length, 0, 'đội trống thì không có ai')
+})
+test('adapter lấy ảnh đại diện từ event (trực tiếp + lồng trong user)', () => {
+  const direct = normalizeEvent({ type: 'chat', comment: 'A', nickname: 'Lan', uniqueId: 'lan', profilePictureUrl: 'https://cdn.example.com/a.jpg' })
+  assert.equal(direct.kind, 'chat')
+  assert.equal(direct.avatar, 'https://cdn.example.com/a.jpg')
+  const nested = normalizeEvent({ type: 'chat', comment: 'B', user: { nickname: 'Minh', uniqueId: 'minh', profilePictureUrl: 'https://cdn.example.com/b.jpg' } })
+  assert.equal(nested.kind, 'chat')
+  assert.equal(nested.nickname, 'Minh')
+  assert.equal(nested.avatar, 'https://cdn.example.com/b.jpg')
+  const none = normalizeEvent({ type: 'chat', comment: 'A', nickname: 'Hoa', uniqueId: 'hoa' })
+  assert.equal(none.avatar, '', 'không có ảnh thì để trống (3D vẽ vòng tròn chữ cái)')
+})
 test('quà của thành viên kéo cho đội mình, người lạ kéo cho đội thua', () => {
   const s = freshMatch()
   s.rope = 0.3 // Xanh đang thua
@@ -161,7 +306,7 @@ test('quà của thành viên kéo cho đội mình, người lạ kéo cho đ�
   assert.equal(giftTeam(s, 'lan', 'B'), 'B', 'chữ kèm "B" thắng cả đội của người tặng')
 })
 
-// ── 8. GiftEngine: hàng đợi, chống trùng, quà lạ, giữ quà trước giờ G ─────
+// ── 10. GiftEngine: hàng đợi, chống trùng, quà lạ, giữ quà trước giờ G ────
 test('giới hạn toàn cục xếp hàng các lượt kéo đến dồn dập', () => {
   const s = freshMatch()
   const eng = new GiftEngine(s)
@@ -212,9 +357,9 @@ test('quà lạ bị bỏ qua, quà tặng trước giờ G vẫn tính khi vào
   assert.equal(eng.queueLength, 0)
 })
 
-test('bảng quà cũ (chiêu dạng chữ) được đổi sang lực kéo', () => {
+test('bảng quà cũ (chiêu dạng chữ + lực cũ) được đổi sang lực kéo mới', () => {
   assert.deepEqual(migrateGiftMap({ 'hoa hong': 'banana', 'hac giay': 'dizzy', 'rosa': 6 }), {
-    'hoa hong': 1, 'hac giay': 30, rosa: 6,
+    'hoa hong': 1, 'hac giay': 100, rosa: 10,
   })
   const s = createMatch({ ...DEFAULT_SETTINGS, giftMap: { 'hoa hong': 'banana' } })
   const eng = new GiftEngine(s)
@@ -229,11 +374,12 @@ test('giá xu quà TikTok + bậc kéo theo xu', () => {
   assert.equal(giftPrice('Quà lạ hoắc'), null)
   assert.equal(giftTier(1), 'Kéo nhẹ')
   assert.equal(giftTier(5), 'Kéo vừa')
-  assert.equal(giftTier(20), 'Kéo mạnh')
+  assert.equal(giftTier(10), 'Kéo mạnh')
+  assert.equal(giftTier(20), 'Kéo rất mạnh')
   assert.equal(giftTier(99), 'Kéo cực mạnh')
 })
 
-// ── 9. Lệnh bình luận ───────────────────────────────────────────────────────
+// ── 11. Lệnh bình luận ──────────────────────────────────────────────────────
 test('lệnh bình luận: A/B vào đội, BẮT ĐẦU/DỪNG/+30S', () => {
   assert.deepEqual(parseCommand('A'), { cmd: 'joinTeam', teamId: 'A' })
   assert.deepEqual(parseCommand('B'), { cmd: 'joinTeam', teamId: 'B' })
@@ -261,14 +407,48 @@ test('bộ nhớ seq: event trùng chỉ tính 1 lần (bắt kịp sau rớt m�
   assert.equal(t.seen(4), true)
 })
 
-// ── 10. Trận: thắng 3 màn, ngôi sao may mắn ────────────────────────────────
-test('thắng 3 màn trước thì vô địch trận', () => {
+// ── 12. Trận: thắng 2 màn (best of 3), ngôi sao may mắn, chuỗi thắng ──────
+test('thắng 2 màn trước thì vô địch trận (best of 3) + chuỗi thắng tăng', () => {
   const s = freshMatch()
-  s.teams.A.roundWins = 2
+  s.teams.A.roundWins = 1
   endRound(s, 'A')
   assert.equal(s.phase, 'matchEnd')
   assert.equal(s.matchWinner, 'A')
-  assert.equal(s.teams.A.roundWins, 3)
+  assert.equal(s.teams.A.roundWins, 2)
+  assert.equal(s.streak.A, 1, 'thắng trận đầu → chuỗi 1')
+  assert.equal(s.streak.B, 0)
+  // Trận sau thắng nữa → chuỗi 2 (chuỗi giữ qua trận).
+  startMatch(s)
+  s.teams.A.roundWins = 1
+  endRound(s, 'A')
+  assert.equal(s.streak.A, 2, 'thắng 2 trận liên tiếp → chuỗi 2')
+  // Đội Xanh thắng thì chuỗi Đỏ về 0.
+  startMatch(s)
+  s.teams.B.roundWins = 1
+  endRound(s, 'B')
+  assert.equal(s.streak.A, 0)
+  assert.equal(s.streak.B, 1)
+})
+
+test('best of 3: 2–1 là Đỏ thắng, 1–1 thì chưa xong (màn 3 quyết định)', () => {
+  const s = freshMatch()
+  // Màn 1: Đỏ thắng → 1–0, chưa vô địch.
+  endRound(s, 'A')
+  assert.equal(s.phase, 'roundEnd', '1–0 thì chưa vô địch')
+  assert.equal(s.matchWinner, null)
+  assert.equal(s.teams.A.roundWins, 1)
+  // Màn 2: Xanh thắng → 1–1, chưa vô địch (màn 3 quyết định).
+  s.round = 2
+  endRound(s, 'B')
+  assert.equal(s.phase, 'roundEnd', '1–1 thì chưa vô địch')
+  assert.equal(s.teams.B.roundWins, 1)
+  assert.equal(s.matchWinner, null)
+  // Màn 3: Đỏ thắng → 2–1, Đỏ vô địch.
+  s.round = 3
+  endRound(s, 'A')
+  assert.equal(s.phase, 'matchEnd', '2–1 thì Đỏ vô địch')
+  assert.equal(s.matchWinner, 'A')
+  assert.equal(s.teams.A.roundWins, 2)
 })
 
 test('đội thắng màn được ngôi sao may mắn ở màn sau', () => {
@@ -281,14 +461,14 @@ test('đội thắng màn được ngôi sao may mắn ở màn sau', () => {
   assert.ok(approx(s.rope, -0.12), `màn sau dây bắt đầu lệch -0,12 về Xanh, được ${s.rope}`)
 })
 
-test('đủ 2 đội, đủ 6 thú', () => {
-  assert.equal(TEAMS.A.pets.length, 3)
-  assert.equal(TEAMS.B.pets.length, 3)
-  assert.equal(PET_TYPES.length, 6)
-  assert.equal(new Set([...TEAMS.A.pets, ...TEAMS.B.pets]).size, 6)
+test('đủ 2 đội, đủ 6 người', () => {
+  assert.equal(TEAMS.A.members.length, 3)
+  assert.equal(TEAMS.B.members.length, 3)
+  assert.equal(MEMBER_TYPES.length, 6)
+  assert.equal(new Set([...TEAMS.A.members, ...TEAMS.B.members]).size, 6)
 })
 
-// ── 11. Tiến thời gian thực: tab nền (dt lớn) vẫn đúng giờ ────────────────
+// ── 13. Tiến thời gian thực: tab nền (dt lớn) vẫn đúng giờ ────────────────
 test('đếm ngược + hết giờ màn chạy đúng với dt lớn', () => {
   const s = createMatch({ ...DEFAULT_SETTINGS, giftMap: { ...DEFAULT_SETTINGS.giftMap } })
   startMatch(s)
@@ -304,7 +484,114 @@ test('đếm ngược + hết giờ màn chạy đúng với dt lớn', () => {
   assert.equal(s.round, 2)
 })
 
-console.log('\n🪢 KÉO CO LIVE — test logic kéo co')
+// ── 14. BXH: ai tặng quà / thả tim nhiều nhất — lưu lại cả phiên ───────────
+test('BXH quà: ghi tổng lực kéo từng người, xếp top 3 đúng thứ tự', () => {
+  const s = freshMatch()
+  applyPull(s, 'A', 1, { nickname: 'Lan', userId: 'lan' }, 'hoa hồng')
+  applyPull(s, 'A', 25, { nickname: 'Hoa', userId: 'hoa' }, 'nước hoa')
+  applyPull(s, 'B', 10, { nickname: 'Minh', userId: 'minh' }, 'rosa')
+  applyPull(s, 'A', 100, { nickname: 'Hoa', userId: 'hoa' }, 'hạc giấy')
+  const top = topGifters(s, 3)
+  assert.equal(top.length, 3, '3 người tặng thì top 3 đủ 3')
+  assert.equal(top[0].nickname, 'Hoa', 'Hoa tặng 125 lực phải đứng đầu')
+  assert.equal(top[0].power, 125)
+  assert.equal(top[0].count, 2, 'Hoa tặng 2 món')
+  assert.equal(top[1].nickname, 'Minh')
+  assert.equal(top[2].nickname, 'Lan')
+})
+
+test('BXH quà: người chưa vào đội vẫn được ghi (tặng quà là lên BXH)', () => {
+  const s = freshMatch()
+  applyPull(s, 'A', 10, { nickname: 'Người lạ', userId: 'la' }, 'rosa')
+  const top = topGifters(s, 3)
+  assert.equal(top.length, 1)
+  assert.equal(top[0].nickname, 'Người lạ')
+  assert.equal(top[0].power, 10)
+})
+
+test('BXH tim: ghi tổng tim từng người (cả khi chưa vào màn kéo)', () => {
+  const s = createMatch({ ...DEFAULT_SETTINGS, giftMap: { ...DEFAULT_SETTINGS.giftMap } })
+  applyLikes(s, 'lan', 30, 'Lan') // chưa vào màn kéo: không +giờ nhưng vẫn đếm tổng
+  assert.equal(s.likes, 30)
+  const top0 = topLikers(s, 3)
+  assert.equal(top0[0].nickname, 'Lan')
+  assert.equal(top0[0].likes, 30)
+  startMatch(s)
+  s.phase = 'pulling'
+  s.roundTimeLeft = 45
+  applyLikes(s, 'minh', 250, 'Minh')
+  applyLikes(s, 'lan', 80, 'Lan')
+  const top = topLikers(s, 3)
+  assert.equal(top[0].nickname, 'Minh', 'Minh 250 tim phải đứng đầu')
+  assert.equal(top[0].likes, 250)
+  assert.equal(top[1].nickname, 'Lan')
+  assert.equal(top[1].likes, 110, 'Lan 30 + 80 = 110 tim')
+})
+
+test('BXH giữ lại qua màn mới + trận mới (chỉ xóa khi bấm Xóa BXH)', () => {
+  const s = freshMatch()
+  applyPull(s, 'A', 10, { nickname: 'Hoa', userId: 'hoa' }, 'rosa')
+  applyLikes(s, 'lan', 50, 'Lan')
+  startMatch(s) // trận mới: BXH không được xóa
+  assert.equal(topGifters(s, 3)[0].nickname, 'Hoa')
+  assert.equal(topLikers(s, 3)[0].nickname, 'Lan')
+  clearBxh(s)
+  assert.equal(topGifters(s, 3).length, 0, 'xóa BXH thì hết')
+  assert.equal(topLikers(s, 3).length, 0)
+})
+
+// ── 15. Hiệu ứng tặng quà: nhỏ = hộp quà mở, to = pháo hoa ─────────────────
+test('quà nhỏ (<25 lực) hiện hiệu ứng hộp quà, quà to (≥25) hiện pháo hoa', () => {
+  const s = freshMatch()
+  applyPull(s, 'A', 1, { nickname: 'Lan', userId: 'lan' }, 'hoa hồng')
+  let fx = s.effects.filter((e) => e.kind === 'gift').pop()
+  assert.ok(fx, 'quà nhỏ cũng phải có hiệu ứng gift')
+  assert.equal(fx.big, false, '1 lực là quà nhỏ')
+  assert.equal(fx.sender, 'Lan')
+  assert.equal(fx.gift, 'hoa hồng')
+  assert.equal(fx.dur, 2, 'quà nhỏ hiện 2 giây')
+  applyPull(s, 'B', 100, { nickname: 'Minh', userId: 'minh' }, 'hạc giấy')
+  fx = s.effects.filter((e) => e.kind === 'gift').pop()
+  assert.equal(fx.big, true, '100 lực là quà to')
+  assert.equal(fx.sender, 'Minh')
+  assert.equal(fx.dur, 3.5, 'quà to hiện 3,5 giây (pháo hoa)')
+})
+
+test('lượt kéo thử (opts.gift=false) không hiện hiệu ứng quà và không lên BXH', () => {
+  const s = freshMatch()
+  applyPull(s, 'A', 25, { nickname: 'Admin thử', userId: 'admin' }, '', { gift: false })
+  assert.equal(s.effects.filter((e) => e.kind === 'gift').length, 0, 'kéo thử không phải quà nên không hiện hiệu ứng')
+  assert.equal(topGifters(s, 3).length, 0, 'kéo thử không phải quà nên không lên BXH')
+})
+
+test('quà đi qua GiftEngine vẫn mang tên quà sang hiệu ứng', () => {
+  const s = freshMatch()
+  const eng = new GiftEngine(s)
+  eng.receive({ id: 'g1', giftName: 'hạc giấy', nickname: 'Hoa', userId: 'hoa', text: 'A' })
+  const res = eng.process(s.now + 1)
+  assert.ok(res.ok, 'quà phải được xử lý')
+  const fx = s.effects.filter((e) => e.kind === 'gift').pop()
+  assert.ok(fx, 'phải có hiệu ứng gift')
+  assert.equal(fx.gift, 'hạc giấy', 'hiệu ứng phải mang đúng tên quà')
+  assert.equal(fx.big, true, 'hạc giấy 100 lực là quà to')
+})
+
+// ── 16. Toast: ai vào xem / theo dõi / chia sẻ hiện 2 giây rồi mất ────────
+test('toast vào xem: hiện 2 giây, ai vào sau thì đổi chữ (không xếp chồng)', () => {
+  const s = freshMatch()
+  pushToast(s, '👋 Lan vừa vào xem!')
+  let fx = s.effects.filter((e) => e.kind === 'toast')
+  assert.equal(fx.length, 1, 'chỉ 1 toast')
+  assert.equal(fx[0].dur, 2, 'toast hiện 2 giây')
+  pushToast(s, '👋 Minh vừa vào xem!')
+  fx = s.effects.filter((e) => e.kind === 'toast')
+  assert.equal(fx.length, 1, 'toast sau không xếp chồng, chỉ đổi chữ')
+  assert.equal(fx[0].text, '👋 Minh vừa vào xem!')
+  step(s, 2.5)
+  assert.equal(s.effects.filter((e) => e.kind === 'toast').length, 0, 'quá 2 giây thì toast mất')
+})
+
+console.log('\n🪢 KÉO CO LIVE — test logic kéo co (luật v2: số đông vs quà, tim = giờ)')
 for (const line of results) console.log(line)
 console.log(`\n${pass} đậu · ${fail} rớt · tổng ${pass + fail}`)
 if (fail > 0) process.exit(1)

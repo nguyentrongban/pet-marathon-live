@@ -90,7 +90,7 @@ export class SoundEngine {
   }
 
   playForPull(effect) {
-    if (effect >= 12) this.bigPull()
+    if (effect >= 25) this.bigPull()
     else this.pull()
   }
 }

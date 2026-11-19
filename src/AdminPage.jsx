@@ -115,14 +115,14 @@ export default function AdminPage() {
             <button onClick={() => postCmd({ cmd: 'resume' })}>▶️ Chơi tiếp</button>
             <button onClick={() => postCmd({ cmd: 'reset' })}>🔄 Trận mới (xóa tỉ số)</button>
           </div>
-          <h3>🔴 {TEAMS.A.name} — {TEAMS.A.pets.map((p) => ({ cat: '🐱', dog: '🐶', rabbit: '🐰' })[p]).join('')} ({teamA?.members?.length || 0} người) · tổng lực kéo {Math.round(teamA?.totalPull || 0)}</h3>
+          <h3>🔴 {TEAMS.A.name} — {TEAMS.A.members.map((p) => ({ soldier: '💂', player: '🥷', michelle: '👩' })[p]).join('')} ({teamA?.members?.length || 0} người · 💪 {Math.round(teamA?.pullRate || 0)} lực) · tổng lực kéo {Math.round(teamA?.totalPull || 0)}</h3>
           {(teamA?.members?.length || 0) === 0 && <p>Chưa có ai — khán giả bình luận A để vào đội Đỏ.</p>}
           <ul className="pml-admin-list">
             {(teamA?.members || []).map((m) => (
               <li key={m.nickname + m.userId}>{m.nickname} · {m.gifts || 0} quà · {Math.round(m.pulls || 0)} lực kéo</li>
             ))}
           </ul>
-          <h3>🔵 {TEAMS.B.name} — {TEAMS.B.pets.map((p) => ({ beaver: '🦫', duck: '🦆', panda: '🐼' })[p]).join('')} ({teamB?.members?.length || 0} người) · tổng lực kéo {Math.round(teamB?.totalPull || 0)}</h3>
+          <h3>🔵 {TEAMS.B.name} — {TEAMS.B.members.map((p) => ({ casual: '👱‍♀️', casual2: '👩‍🦰', soldierB: '👨‍🦱' })[p]).join('')} ({teamB?.members?.length || 0} người · 💪 {Math.round(teamB?.pullRate || 0)} lực) · tổng lực kéo {Math.round(teamB?.totalPull || 0)}</h3>
           {(teamB?.members?.length || 0) === 0 && <p>Chưa có ai — khán giả bình luận B để vào đội Xanh.</p>}
           <ul className="pml-admin-list">
             {(teamB?.members || []).map((m) => (
@@ -130,6 +130,28 @@ export default function AdminPage() {
             ))}
           </ul>
           <p className="pml-admin-note">{BALANCE_NOTE}</p>
+          {(snap?.streak?.A || snap?.streak?.B) > 0 && (
+            <p>🔥 Chuỗi thắng trận liên tiếp: 🔴 {snap?.streak?.A || 0} — {snap?.streak?.B || 0} 🔵</p>
+          )}
+          <h3>🏆 BXH — ai tặng quà / thả tim nhiều nhất (lưu lại cả phiên)</h3>
+          {(!snap?.bxh?.gifters?.length && !snap?.bxh?.likers?.length) && <p>Chưa có ai tặng quà hay thả tim — BXH hiện khi có người tặng/thả tim, bảng nhỏ ở góc trái màn hình hiển thị.</p>}
+          {(snap?.bxh?.gifters?.length || 0) > 0 && (
+            <ul className="pml-admin-list">
+              {snap.bxh.gifters.map((g, i) => (
+                <li key={`g${i}`}>🎁 #{i + 1} {g.nickname} · 💪 {Math.round(g.power)} lực · {g.count || 0} quà{g.coins ? ` · 🪙 ${g.coins} xu` : ''}</li>
+              ))}
+            </ul>
+          )}
+          {(snap?.bxh?.likers?.length || 0) > 0 && (
+            <ul className="pml-admin-list">
+              {snap.bxh.likers.map((g, i) => (
+                <li key={`l${i}`}>❤️ #{i + 1} {g.nickname} · {g.likes} tim</li>
+              ))}
+            </ul>
+          )}
+          <div className="pml-admin-btns">
+            <button onClick={() => { postCmd({ cmd: 'resetBxh' }); flash('Đã xóa BXH — bắt đầu lại từ đầu.') }}>🗑️ Xóa BXH (live mới / ngày mới)</button>
+          </div>
         </section>
       )}
 
@@ -137,7 +159,7 @@ export default function AdminPage() {
       {tab === 'gifts' && (
         <section className="pml-admin-sec">
           <h2>🎁 Quà tặng → Lực kéo</h2>
-          <p className="pml-admin-note">Quà thật trên TikTok, chỉ lấy quà dưới 100 xu — xu càng cao kéo càng mạnh (1 xu = 1 lực, 5 xu = 3, 10 xu = 6, 20 xu = 12, 99 xu = 30). Chạm vào một món quà để mở bảng chi tiết của nó — giống bảng chọn quà trên TikTok. Quà nào không có trong bảng sẽ bị bỏ qua (không tự đoán).</p>
+          <p className="pml-admin-note">Quà thật trên TikTok, chỉ lấy quà dưới 100 xu — quà là cú bùng sức mạnh, 1 món quà to bằng cả đám đông (1 xu = 1 lực, 5 xu = 5, 10 xu = 10, 20 xu = 25, 99 xu = 100). Chạm vào một món quà để mở bảng chi tiết của nó — giống bảng chọn quà trên TikTok. Quà nào không có trong bảng sẽ bị bỏ qua (không tự đoán).</p>
           <GiftMapEditor giftMap={settings.giftMap || {}} onSave={(giftMap) => updateSettings({ giftMap })} onTest={(gift) => { postCmd({ cmd: 'simGift', giftName: gift, nickname: 'Bạn Thử', userId: 'test', text: '' }); flash('Đã gửi thử quà lên màn hiển thị.') }} />
           <h3>⚖️ Giới hạn cân bằng</h3>
           <div className="pml-admin-grid">
@@ -145,13 +167,28 @@ export default function AdminPage() {
               <input type="number" min="15" max="180" defaultValue={settings.roundSeconds} onBlur={(e) => updateSettings({ roundSeconds: Math.max(15, Number(e.target.value) || 45) })} />
             </label>
             <label className="pml-admin-field">Thắng bao nhiêu màn thì vô địch trận
-              <input type="number" min="1" max="7" defaultValue={settings.winsToMatch} onBlur={(e) => updateSettings({ winsToMatch: Math.max(1, Number(e.target.value) || 3) })} />
+              <input type="number" min="1" max="7" defaultValue={settings.winsToMatch} onBlur={(e) => updateSettings({ winsToMatch: Math.max(1, Number(e.target.value) || 2) })} />
             </label>
             <label className="pml-admin-field">Lượt kéo toàn trận: cách nhau ít nhất (giây)
               <input type="number" min="0" max="5" step="0.5" defaultValue={settings.globalPullIntervalSec} onBlur={(e) => updateSettings({ globalPullIntervalSec: Math.max(0, Number(e.target.value) || 0.5) })} />
             </label>
-            <label className="pml-admin-field">Số tim để tiếp sức đội thua
-              <input type="number" min="10" max="1000" defaultValue={settings.likeBoostEvery} onBlur={(e) => updateSettings({ likeBoostEvery: Math.max(10, Number(e.target.value) || 100) })} />
+            <label className="pml-admin-field">Tim: 1 người thả đủ bao nhiêu tim thì +thời gian
+              <input type="number" min="10" max="1000" defaultValue={settings.likeTimeEvery} onBlur={(e) => updateSettings({ likeTimeEvery: Math.max(10, Number(e.target.value) || 100) })} />
+            </label>
+            <label className="pml-admin-field">Mỗi lần đủ tim thì +bao nhiêu giây kéo
+              <input type="number" min="1" max="60" defaultValue={settings.likeTimeSeconds} onBlur={(e) => updateSettings({ likeTimeSeconds: Math.max(1, Number(e.target.value) || 10) })} />
+            </label>
+            <label className="pml-admin-field">Tối đa +bao nhiêu giây / màn (do tim)
+              <input type="number" min="0" max="300" defaultValue={settings.likeTimeMaxBonus} onBlur={(e) => updateSettings({ likeTimeMaxBonus: Math.max(0, Number(e.target.value) || 60) })} />
+            </label>
+            <label className="pml-admin-field">Giờ chót: bắt đầu khi còn (giây)
+              <input type="number" min="0" max="30" defaultValue={settings.finalSeconds} onBlur={(e) => updateSettings({ finalSeconds: Math.max(0, Number(e.target.value) || 10) })} />
+            </label>
+            <label className="pml-admin-field">Giờ chót: quà tặng nhân mấy lần lực kéo
+              <input type="number" min="1" max="5" step="0.5" defaultValue={settings.finalGiftMult} onBlur={(e) => updateSettings({ finalGiftMult: Math.max(1, Number(e.target.value) || 2) })} />
+            </label>
+            <label className="pml-admin-field">Tốc độ dây tối đa (khi 1 đội áp đảo hoàn toàn)
+              <input type="number" min="0.02" max="0.5" step="0.01" defaultValue={settings.ropeSpeed} onBlur={(e) => updateSettings({ ropeSpeed: Math.max(0.02, Number(e.target.value) || 0.12) })} />
             </label>
             <label className="pml-admin-field">Cơ hội cuối: đội thua quá (0–1) thì nhân đôi lực kéo
               <input type="number" min="0.1" max="0.95" step="0.05" defaultValue={settings.comebackAt} onBlur={(e) => updateSettings({ comebackAt: Math.min(0.95, Math.max(0.1, Number(e.target.value) || 0.55)) })} />
@@ -328,7 +365,7 @@ function GiftMapEditor({ giftMap, onSave, onTest }) {
 }
 
 // ─── Panel kiểm thử kéo ───
-const POWER_CHOICES = [1, 3, 6, 12, 30]
+const POWER_CHOICES = [1, 5, 10, 25, 100]
 function TestPanel({ phase, giftMap, onDone }) {
   const [teamId, setTeamId] = useState('A')
   const [power, setPower] = useState(6)

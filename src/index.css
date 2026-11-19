@@ -116,38 +116,38 @@ input, select { font-family: inherit; }
   box-shadow: 0 4px 14px rgba(255, 200, 0, .4);
 }
 
-.pml-floaters { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
-.pml-floater {
-  position: absolute;
-  font-size: 21px; font-weight: 900; color: #fff; text-shadow: 0 2px 0 #d97706, 0 3px 10px rgba(0,0,0,.6);
-  animation: pml-float-up 2.2s ease-out forwards; white-space: nowrap;
+/* ── Dải kết quả nhỏ ở dưới (thắng màn / hòa / vô địch / tạm dừng) ──
+   Chỉ 1 dòng, không che sân 3D. */
+.pml-result-banner {
+  position: absolute; left: 10px; right: 10px; bottom: calc(56px + env(safe-area-inset-bottom)); z-index: 7;
+  background: linear-gradient(90deg, rgba(180, 83, 9, .93), rgba(220, 120, 20, .9));
+  border: 1px solid rgba(255, 200, 100, .55); border-radius: 999px; padding: 9px 12px;
+  font-size: 13.5px; font-weight: 800; text-align: center; color: #fff;
+  box-shadow: 0 6px 18px rgba(0,0,0,.4); text-shadow: 0 1px 2px rgba(0,0,0,.4);
+  animation: pml-banner-in .3s ease-out;
 }
-.pml-floater.left { left: 8%; }
-.pml-floater.right { right: 8%; }
-@keyframes pml-float-up {
-  0% { opacity: 0; transform: translateY(14px) scale(.7); }
-  15% { opacity: 1; transform: translateY(0) scale(1.12); }
-  30% { transform: translateY(-4px) scale(1); }
-  100% { opacity: 0; transform: translateY(-46px) scale(1); }
+.pml-result-banner.champion {
+  background: linear-gradient(90deg, rgba(180, 130, 10, .95), rgba(245, 180, 10, .92));
+  border-color: rgba(255, 230, 120, .7);
 }
+@keyframes pml-banner-in { from { transform: translateY(8px); } }
 
-/* ── Thẻ thắng màn / vô địch ── */
-.pml-winner-card {
-  background: linear-gradient(180deg, #ffffff 0%, #fdf6e3 100%); color: #14532d; border-radius: 26px;
-  padding: 26px 18px 20px; width: 100%; max-width: 420px; text-align: center;
-  box-shadow: 0 18px 50px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.6) inset;
-  animation: pml-winner-in .4s ease-out;
+/* ── Thẻ chờ chọn đội: nhỏ, ở dưới, chạm để bắt đầu ── */
+.pml-wait-tap { position: absolute; inset: 0; z-index: 3; }
+.pml-wait-card {
+  position: absolute; left: 10px; right: 10px; bottom: calc(56px + env(safe-area-inset-bottom)); z-index: 7;
+  background: rgba(8, 38, 26, .72); border: 1px solid rgba(255,255,255,.22); border-radius: 18px;
+  padding: 11px 12px; backdrop-filter: blur(6px); box-shadow: 0 8px 22px rgba(0,0,0,.35);
+  text-align: center; cursor: pointer;
 }
-@keyframes pml-winner-in { from { opacity: 0; transform: scale(.85); } }
-.pml-winner-emoji { font-size: 56px; filter: drop-shadow(0 3px 6px rgba(0,0,0,.25)); }
-.pml-winner-title {
-  font-size: 24px; font-weight: 900; margin: 8px 0 6px;
-  background: linear-gradient(90deg, #b45309, #f59e0b);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #b45309;
+.pml-wait-line { font-size: 12.5px; font-weight: 600; line-height: 1.5; }
+.pml-wait-go {
+  margin-top: 7px; font-weight: 900; font-size: 14px; color: #fff;
+  background: linear-gradient(90deg, #f59e0b, #ef4444); border-radius: 999px; padding: 8px 10px;
+  box-shadow: 0 6px 18px rgba(239, 68, 68, .4); animation: pml-join-pulse 1.6s ease-in-out infinite;
 }
-.pml-winner-score { font-size: 22px; font-weight: 900; margin: 4px 0; }
-.pml-winner-sub { font-size: 15px; font-weight: 700; color: #4d7c5f; margin-top: 6px; }
-.pml-podium-foot { margin-top: 12px; font-size: 13px; font-weight: 700; color: #4d7c5f; }
+@keyframes pml-join-pulse { 50% { transform: scale(1.03); box-shadow: 0 6px 24px rgba(239, 68, 68, .55); } }
+.pml-wait-sub { margin-top: 7px; font-size: 12px; font-weight: 600; opacity: .85; }
 
 .pml-countdown {
   position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); z-index: 8;
@@ -159,42 +159,134 @@ input, select { font-family: inherit; }
 }
 @keyframes pml-count-pop { 0% { transform: translate(-50%,-50%) scale(1.5); opacity: 0; } 25% { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
 
-.pml-overlay {
-  position: absolute; inset: 0; z-index: 9; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; text-align: center;
-  background: rgba(0,0,0,.45); padding: 20px;
+/* ── Lật kèo: 1 món quà mạnh hơn cả đội kia — hiện to giữa màn hình 2,5 giây ── */
+.pml-flip {
+  position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); z-index: 8;
+  background: linear-gradient(90deg, #0ea5e9, #2563eb); color: #fff;
+  border: 2px solid rgba(255,255,255,.8); border-radius: 18px; padding: 12px 16px;
+  font-size: 17px; font-weight: 900; text-align: center; line-height: 1.35;
+  box-shadow: 0 10px 30px rgba(37, 99, 235, .6); text-shadow: 0 2px 4px rgba(0,0,0,.4);
+  animation: pml-flip-in .3s ease-out; pointer-events: none; max-width: 86vw;
 }
-.pml-overlay h1 { margin: 6px 0; font-size: 30px; }
-.pml-overlay p { margin: 4px 0; font-size: 15px; opacity: .95; }
-.pml-overlay .big-emoji { font-size: 64px; }
-.pml-rules-card {
-  background: linear-gradient(180deg, #ffffff 0%, #f3fbf5 100%); color: #14532d; border-radius: 26px;
-  padding: 22px 16px 18px; width: 100%; max-width: 420px;
-  box-shadow: 0 18px 50px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.6) inset;
+@keyframes pml-flip-in { from { transform: translate(-50%,-50%) scale(.7); } }
+
+/* ── Tim cộng giờ: +10s hiện nhỏ dưới đồng hồ ── */
+.pml-timeflash {
+  position: absolute; top: calc(50% + 130px); left: 50%; transform: translateX(-50%); z-index: 8;
+  background: rgba(225, 29, 72, .92); color: #fff; border-radius: 999px; padding: 7px 14px;
+  font-size: 14px; font-weight: 900; box-shadow: 0 6px 18px rgba(225, 29, 72, .5);
+  animation: pml-banner-in .25s ease-out; pointer-events: none; white-space: nowrap;
 }
-.pml-rules-title {
-  font-size: 25px; font-weight: 900; margin-bottom: 4px; letter-spacing: .4px;
-  background: linear-gradient(90deg, #14532d, #16a34a);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #14532d;
+
+/* ── Toast: ai vào xem / theo dõi / chia sẻ — hiện 2 giây rồi mất ── */
+.pml-toast {
+  position: absolute; top: calc(212px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 8;
+  background: rgba(8, 38, 26, .8); color: #fff; border: 1px solid rgba(255,255,255,.25);
+  border-radius: 999px; padding: 7px 13px; font-size: 13px; font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35); backdrop-filter: blur(6px);
+  animation: pml-toast-life 2s ease-in-out both; pointer-events: none; white-space: nowrap; max-width: 92vw;
+  overflow: hidden; text-overflow: ellipsis;
 }
-.pml-rules-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
-.pml-rules-tile {
-  border-radius: 16px; padding: 12px 10px; font-size: 13px; line-height: 1.4;
-  border: 1px solid rgba(20, 83, 45, .08); box-shadow: 0 3px 10px rgba(20, 83, 45, .08);
+@keyframes pml-toast-life {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  8% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
 }
-.pml-rules-tile span { font-size: 26px; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,.18)); }
-.pml-rules-tile b { font-size: 13.5px; }
-.pml-rules-tile.pink { background: linear-gradient(180deg, #ffe4ec, #ffd3e0); }
-.pml-rules-tile.yellow { background: linear-gradient(180deg, #fff3bf, #ffe58a); }
-.pml-rules-tile.blue { background: linear-gradient(180deg, #dbeafe, #bfdbfe); }
-.pml-rules-tile.green { background: linear-gradient(180deg, #dcfce7, #bbf7d0); }
-.pml-rules-join {
-  margin-top: 14px; font-weight: 900; font-size: 16px; color: #fff;
-  background: linear-gradient(90deg, #f59e0b, #ef4444); border-radius: 999px; padding: 10px 12px;
-  box-shadow: 0 6px 18px rgba(239, 68, 68, .4); animation: pml-join-pulse 1.6s ease-in-out infinite;
+
+/* ── Hiệu ứng quà nhỏ: hộp quà mở ra + hiện tên người tặng ──
+   (Không đặt animation mờ dần ở khung ngoài — khung phải hiện ngay khi
+   có hiệu ứng; hết giờ thì React gỡ khỏi DOM. Animation chỉ ở phần tử
+   con để mở đầu cho đẹp.) */
+.pml-gift {
+  position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); z-index: 9;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  pointer-events: none; text-align: center;
 }
-@keyframes pml-join-pulse { 50% { transform: scale(1.03); box-shadow: 0 6px 24px rgba(239, 68, 68, .55); } }
-.pml-overlay-hint { margin-top: 10px; font-size: 13px; font-weight: 600; opacity: .75; }
+.pml-gift-box { position: relative; }
+.pml-gift-emoji {
+  font-size: 64px; line-height: 1; display: inline-block;
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,.5));
+  animation: pml-gift-pop .55s cubic-bezier(.34, 1.56, .64, 1);
+}
+.pml-gift-spark {
+  position: absolute; top: -8px; right: -14px; font-size: 26px; opacity: 0;
+  animation: pml-spark-burst .8s ease-out .35s;
+}
+.pml-gift-name {
+  font-size: 20px; font-weight: 900; color: #fff;
+  text-shadow: 0 2px 0 rgba(0,0,0,.5), 0 2px 10px rgba(0,0,0,.6);
+  animation: pml-banner-in .3s ease-out .2s;
+}
+.pml-gift-sub {
+  font-size: 13px; font-weight: 800; color: #ffe08a;
+  text-shadow: 0 1px 3px rgba(0,0,0,.7);
+  animation: pml-banner-in .3s ease-out .25s;
+}
+@keyframes pml-gift-pop {
+  0% { transform: scale(.3) rotate(-14deg); }
+  60% { transform: scale(1.15) rotate(4deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+@keyframes pml-spark-burst {
+  0% { transform: scale(.3); opacity: 0; }
+  40% { transform: scale(1.4); opacity: 1; }
+  100% { transform: scale(1.1) translateY(-8px); opacity: 0; }
+}
+
+/* ── Hiệu ứng quà to: nổ pháo hoa + tên người tặng hiện nổi bật ──
+   (Khung ngoài hiện ngay, không mờ dần — xem ghi chú ở .pml-gift.) */
+.pml-fireworks {
+  position: absolute; inset: 0; z-index: 9; pointer-events: none; overflow: hidden;
+}
+.fw-burst {
+  position: absolute; width: 90px; height: 90px; border-radius: 50%; opacity: 0;
+  background: radial-gradient(circle, #fff 0%, #ffd60a 25%, rgba(255, 140, 0, .85) 45%, rgba(255, 60, 60, 0) 70%);
+  animation: pml-fw-burst 1.4s ease-out;
+}
+.fw-1 { top: 18%; left: 12%; animation-delay: 0s; }
+.fw-2 { top: 24%; right: 10%; background: radial-gradient(circle, #fff 0%, #74c0fc 25%, rgba(37, 99, 235, .85) 45%, rgba(37, 99, 235, 0) 70%); animation-delay: .25s; }
+.fw-3 { top: 38%; left: 30%; background: radial-gradient(circle, #fff 0%, #f783ac 25%, rgba(225, 29, 72, .85) 45%, rgba(225, 29, 72, 0) 70%); animation-delay: .5s; }
+.fw-4 { top: 34%; right: 26%; background: radial-gradient(circle, #fff 0%, #b197fc 25%, rgba(124, 58, 237, .85) 45%, rgba(124, 58, 237, 0) 70%); animation-delay: .75s; }
+.fw-5 { top: 12%; left: 44%; width: 110px; height: 110px; background: radial-gradient(circle, #fff 0%, #8ce99a 25%, rgba(34, 197, 94, .85) 45%, rgba(34, 197, 94, 0) 70%); animation-delay: 1s; }
+@keyframes pml-fw-burst {
+  0% { transform: scale(.1); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.pml-fireworks-name {
+  position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center;
+}
+.pml-fireworks-name .fw-crown { font-size: 40px; line-height: 1; animation: pml-gift-pop .5s cubic-bezier(.34, 1.56, .64, 1); }
+.pml-fireworks-name .fw-name {
+  font-size: 30px; font-weight: 900; letter-spacing: .3px;
+  background: linear-gradient(180deg, #fff7ae, #ffd60a 60%, #ff9f1c);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #ffd60a;
+  filter: drop-shadow(0 3px 0 rgba(120, 53, 15, .9)) drop-shadow(0 6px 18px rgba(0,0,0,.6));
+  animation: pml-gift-pop .55s cubic-bezier(.34, 1.56, .64, 1) .15s;
+}
+.pml-fireworks-name .fw-sub {
+  font-size: 14.5px; font-weight: 900; color: #fff;
+  text-shadow: 0 2px 3px rgba(0,0,0,.7);
+  background: rgba(8, 38, 26, .65); border-radius: 999px; padding: 6px 13px;
+  animation: pml-banner-in .3s ease-out .3s;
+}
+
+/* ── BXH nhỏ ở góc trái dưới: ai tặng quà / thả tim nhiều nhất ── */
+.pml-bxh {
+  position: absolute; left: 10px; bottom: calc(104px + env(safe-area-inset-bottom)); z-index: 6;
+  background: rgba(8, 38, 26, .68); border: 1px solid rgba(255,255,255,.2); border-radius: 14px;
+  padding: 8px 10px; backdrop-filter: blur(6px); box-shadow: 0 4px 14px rgba(0,0,0,.3);
+  pointer-events: none; max-width: 46vw;
+}
+.pml-bxh-title { font-size: 12px; font-weight: 900; letter-spacing: .5px; margin-bottom: 4px; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.pml-bxh-sec { margin-top: 5px; }
+.pml-bxh-head { font-size: 10.5px; font-weight: 800; opacity: .85; margin-bottom: 2px; }
+.pml-bxh-row { display: flex; gap: 5px; align-items: baseline; font-size: 12px; line-height: 1.45; }
+.pml-bxh-rank { font-size: 11px; }
+.pml-bxh-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22vw; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.pml-bxh-val { margin-left: auto; font-weight: 800; color: #ffe08a; white-space: nowrap; }
 
 .pml-guide {
   position: absolute; top: 60px; right: 10px; z-index: 10; width: min(86vw, 320px);
@@ -205,21 +297,6 @@ input, select { font-family: inherit; }
 .pml-guide h3 { margin: 0 0 8px; }
 .pml-guide p { margin: 6px 0; }
 .pml-guide-x { position: absolute; top: 8px; right: 8px; border: none; background: none; font-size: 16px; }
-
-.pml-feed {
-  position: absolute; left: 10px; right: 10px; bottom: calc(56px + env(safe-area-inset-bottom)); z-index: 5;
-  display: flex; flex-direction: column; gap: 4px; pointer-events: none; align-items: flex-start;
-}
-.pml-feed-line {
-  background: rgba(8, 38, 26, .6); border: 1px solid rgba(255,255,255,.16);
-  border-radius: 999px; padding: 6px 12px; backdrop-filter: blur(6px);
-  font-size: 13px; font-weight: 600; width: fit-content; max-width: 100%;
-  box-shadow: 0 3px 10px rgba(0,0,0,.25); text-shadow: 0 1px 2px rgba(0,0,0,.4);
-  animation: pml-feed-in .25s ease-out;
-}
-@keyframes pml-feed-in { from { opacity: 0; transform: translateY(6px); } }
-.pml-feed-line.win { background: linear-gradient(90deg, rgba(180, 83, 9, .92), rgba(220, 120, 20, .88)); font-weight: 800; border-color: rgba(255, 200, 100, .5); }
-.pml-feed-line.pull { background: linear-gradient(90deg, rgba(25, 113, 194, .9), rgba(34, 139, 230, .85)); font-weight: 800; border-color: rgba(150, 210, 255, .4); }
 
 .pml-bottombar {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
@@ -303,5 +380,4 @@ input, select { font-family: inherit; }
 }
 @media (max-width: 420px) {
   .pml-countdown { font-size: 76px; }
-  .pml-winner-title { font-size: 20px; }
 }
