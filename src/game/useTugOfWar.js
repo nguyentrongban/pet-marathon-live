@@ -133,7 +133,10 @@ export function useTugOfWar() {
     voiceRef.current = new VoiceEngine({
       apiBase: import.meta.env?.VITE_API_URL || '',
       voice: settings0.voice || 'banmai',
-      enabled: settings0.voiceOn !== false && settings0.soundOn !== false,
+      // Giọng đọc chỉ theo nút voiceOn trong Admin — KHÔNG theo nút tắt
+      // tiếng trên màn hình (nút đó chỉ tắt nhạc hiệu ứng). Trước đây giọng
+      // đọc tắt theo tiếng nên streamer tắt tiếng là mất luôn giọng đọc.
+      enabled: settings0.voiceOn !== false,
       onModeChange: (mode) => {
         if (mode === 'device') logWs('🎙️ Hết lượt / lỗi giọng FPT.AI — đang dùng giọng máy miễn phí, thử lại sau 5 phút.')
         else logWs('🎙️ Đã nối lại giọng FPT.AI.')
@@ -389,8 +392,13 @@ export function useTugOfWar() {
         if (msg.settings?.giftMap) s.settings.giftMap = migrateGiftMap(msg.settings.giftMap)
         sound.enabled = s.settings.soundOn !== false
         if (msg.settings?.voice) voiceRef.current?.setVoice(msg.settings.voice)
-        voiceRef.current?.setEnabled(s.settings.soundOn !== false && s.settings.voiceOn !== false)
+        voiceRef.current?.setEnabled(s.settings.voiceOn !== false)
         saveSettings(s.settings)
+        takeSnap()
+      } else if (msg.cmd === 'testVoice') {
+        // Thử giọng đọc: đọc 1 câu ngay, kể cả khi đang tắt tiếng (để
+        // streamer kiểm tra giọng có kêu không).
+        voiceRef.current?.speak('Hà Nội đang dẫn đầu, thử giọng đọc bình luận!', 'high', true)
         takeSnap()
       } else if (msg.cmd === 'connect') {
         try { localStorage.setItem(WS_KEY, JSON.stringify({ wsUrl: msg.wsUrl, key: msg.key })) } catch { /* ignore */ }
@@ -411,7 +419,6 @@ export function useTugOfWar() {
       } else if (msg.cmd === 'toggleSound') {
         s.settings.soundOn = !s.settings.soundOn
         sound.enabled = s.settings.soundOn
-        voiceRef.current?.setEnabled(s.settings.soundOn && s.settings.voiceOn !== false)
         saveSettings(s.settings)
         setMuted(!s.settings.soundOn)
         takeSnap()
@@ -634,7 +641,6 @@ export function useTugOfWar() {
     const s = stateRef.current
     s.settings.soundOn = !s.settings.soundOn
     soundRef.current.enabled = s.settings.soundOn
-    voiceRef.current?.setEnabled(s.settings.soundOn && s.settings.voiceOn !== false)
     saveSettings(s.settings)
     setMuted(!s.settings.soundOn)
     takeSnap()

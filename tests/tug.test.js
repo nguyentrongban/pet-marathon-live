@@ -883,6 +883,19 @@ test('tắt giọng đọc thì speak() không làm gì', () => {
   assert.equal(v.queue.length, 0)
 })
 
+test('nút Thử giọng đọc: force=true thì đọc kể cả khi đang tắt', () => {
+  const v = new VoiceEngine({ apiBase: '', enabled: false })
+  assert.equal(v.speak('Hà Nội đang dẫn đầu, thử giọng đọc bình luận!', 'high', true), true)
+  assert.equal(v.queue.length, 0, 'câu thử được đọc ngay, không nằm chờ trong hàng đợi')
+  v.stop()
+})
+
+test('unlock() không lỗi khi không có window (chạy test node)', () => {
+  const v = new VoiceEngine({ apiBase: '' })
+  v.unlock()
+  assert.equal(v._warmedUp, false, 'không có giọng máy thì chưa mở khóa')
+})
+
 test('câu y hệt vừa đọc trong 3 giây thì không đọc lặp', () => {
   const v = new VoiceEngine({ apiBase: '' })
   v.speak('Hà Nội thắng màn 1!', 'high')

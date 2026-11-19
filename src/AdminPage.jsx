@@ -301,7 +301,9 @@ export default function AdminPage() {
               ? 'đang dùng giọng máy miễn phí trên điện thoại (FPT.AI hết lượt hoặc tạm lỗi — sẽ tự thử lại sau 5 phút).'
               : 'đang dùng giọng FPT.AI.'}
             {' '}Hết lượt FPT.AI thì game tự chuyển sang giọng máy miễn phí, không im lặng.
+            Nút tắt tiếng trên màn hình chỉ tắt nhạc hiệu ứng, không tắt giọng đọc.
           </p>
+          <button className="pml-admin-btn" onClick={() => { postCmd({ cmd: 'testVoice' }); flash('Đã gửi thử giọng đọc lên màn hiển thị — nghe thử xem có tiếng không.') }}>🔊 Thử giọng đọc</button>
           <p className="pml-admin-note">
             API lưu kết quả:{' '}{import.meta.env?.VITE_API_URL ? 'đã gắn địa chỉ.' : 'chưa gắn — kết quả trận chỉ hiện trên màn hình, không lưu lên mạng.'}
           </p>

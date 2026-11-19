@@ -59,6 +59,7 @@ export class VoiceEngine {
     this.fptCooldownUntil = 0
     this.lastSpokenText = ''
     this.lastSpokenAt = 0
+    this._warmedUp = false
   }
 
   getMode() { return this.mode }
@@ -73,7 +74,19 @@ export class VoiceEngine {
   unlock() {
     // Đánh thức giọng máy để lần đọc đầu không bị trễ (iPhone tải giọng chậm).
     try {
-      if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.getVoices()
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.getVoices()
+        // iPhone: chỉ gọi getVoices() thì chưa đủ — phải gọi speak() 1 lần
+        // trong lúc chạm thì lần đọc sau mới có tiếng. Đọc 1 câu câm (âm
+        // lượng 0) để mở khóa mà không phát ra tiếng.
+        if (!this._warmedUp) {
+          this._warmedUp = true
+          const u = new SpeechSynthesisUtterance('a')
+          u.lang = 'vi-VN'
+          u.volume = 0
+          window.speechSynthesis.speak(u)
+        }
+      }
     } catch { /* ignore */ }
   }
 
@@ -87,8 +100,10 @@ export class VoiceEngine {
     this.speaking = false
   }
 
-  speak(text, priority = 'normal') {
-    if (!this.enabled) return false
+  // force=true: đọc kể cả khi đang tắt (dùng cho nút "Thử giọng đọc" trong
+  // Admin — streamer bấm để kiểm tra giọng thì phải nghe thấy).
+  speak(text, priority = 'normal', force = false) {
+    if (!this.enabled && !force) return false
     const t = String(text || '').trim()
     if (!t) return false
     // Câu y hệt vừa đọc trong 3 giây thì bỏ (tránh đọc lặp do event trùng).
