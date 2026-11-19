@@ -102,8 +102,15 @@ const BONE_MAP = {
 const PULL_POSE = {
   hips: { x: -0.10 },
   spine: { x: -0.08 }, spine1: { x: -0.06 }, spine2: { x: -0.04 },
-  lArm: { x: -0.65, z: -0.4 }, rArm: { x: -0.78, z: 0.4 },
-  lFore: { x: -0.45 }, rFore: { x: -0.45 },
+  // Tay: CHẠM DÂY mới đúng chuẩn — đã đo bằng trang chẩn đoán tay
+  // (test-arms.html, xem trước mặt). rotation.x ÂM mới đưa tay về phía
+  // trước; phải -1,2 (69°) thì tay mới vươn hẳn ra trước, -0,65 cũ chỉ
+  // nghiêng 37° nên tay vẫn chìa sang 2 bên, nhìn như để sau lưng.
+  // z = +0,5 (CÙNG dấu 2 tay — xương tay trái/phải Mixamo cùng hướng
+  // trục local, đừng đảo dấu) hạ tay xuống ngang dây; cẳng tay gập -0,6
+  // để 2 bàn tay chụm lại nắm dây.
+  lArm: { x: -1.2, z: 0.5 }, rArm: { x: -1.2, z: 0.5 },
+  lFore: { x: -0.6 }, rFore: { x: -0.6 },
   lUpLeg: { x: 0.40 }, rUpLeg: { x: -0.45 },
   lLeg: { x: 0.10 }, rLeg: { x: 0.45 },
   head: { x: -0.12 },
@@ -872,8 +879,12 @@ export default function TugScene({ liveRef }) {
         return own(['sambadance', 'victory']) || (entry.rig === 'mixamo' ? clipPool.get('victory') : null) || own(['idle'])
       }
       if (want === 'walk') return own(['walk']) || (entry.rig === 'mixamo' ? clipPool.get('walk') : null)
+      // KHÔNG lấy clip đầu tiên bừa (entry.clips.values().next()) — clip
+      // đầu của file có thể là clip cúi/ngồi/nhảy, nhân vật sẽ lùn xuống
+      // như độn thổ; chỉ dùng 'idle', mượn từ pool, 'tpose' đứng yên, còn
+      // không thì null (đứng tư thế gốc) cho tới khi idle tải xong.
       return own(['idle']) || (entry.rig === 'mixamo' ? clipPool.get('idle') : null)
-        || entry.clips.values().next().value || null
+        || own(['tpose']) || null
     }
     const setClip = (entry, want) => {
       if (!entry.mixer) return

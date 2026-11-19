@@ -3,15 +3,17 @@
 // BroadcastChannel (mở 2 tab cùng trình duyệt). Không chứa logic game.
 
 import { useEffect, useRef, useState } from 'react'
+import { ClipboardList, Coins, Flame, Gift, Heart, MessageCircle, Pause, Play, Plug, PlugZap, Plus, RotateCcw, Scale, Settings, TestTube, Trash2, Trophy, User, Users, Zap } from 'lucide-react'
 import { onSyncMessage, postCmd, postSnapshotReq } from './game/sync'
-import { BALANCE_NOTE, DEFAULT_SETTINGS, TEAMS, giftIcon, giftPrice, giftTier } from './game/engine'
+import GiftIcon from './components/GiftIcon'
+import { BALANCE_NOTE, DEFAULT_SETTINGS, TEAMS, giftPrice, giftTier } from './game/engine'
 
 const TABS = [
-  { id: 'tug', label: '🪢 Kéo co' },
-  { id: 'gifts', label: '🎁 Quà & Lực kéo' },
-  { id: 'test', label: '🎲 Kiểm thử' },
-  { id: 'connect', label: '🔗 Kết nối' },
-  { id: 'settings', label: '⚙️ Cài đặt' },
+  { id: 'tug', label: (<><span className="pml-ic"><Users size={16} /></span> Kéo co</>) },
+  { id: 'gifts', label: (<><span className="pml-ic"><Gift size={16} /></span> Quà & Lực kéo</>) },
+  { id: 'test', label: (<><span className="pml-ic"><TestTube size={16} /></span> Kiểm thử</>) },
+  { id: 'connect', label: (<><span className="pml-ic"><Plug size={16} /></span> Kết nối</>) },
+  { id: 'settings', label: (<><span className="pml-ic"><Settings size={16} /></span> Cài đặt</>) },
 ]
 
 const PHASE_LABEL = {
@@ -86,7 +88,7 @@ export default function AdminPage() {
   return (
     <div className="pml-admin">
       <header className="pml-admin-head">
-        <h1>🪢 KÉO CO LIVE <span>— Bảng điều khiển</span></h1>
+        <h1><span className="pml-ic"><Users size={22} /></span> KÉO CO LIVE <span>— Bảng điều khiển</span></h1>
         <div className="pml-admin-status">
           <span className={`pml-dot ${connected ? 'on' : ''}`} />
           {connected ? 'Đã nối live' : displayAlive ? 'Màn hiển thị đang chạy — chưa nối live' : 'Chưa thấy màn hiển thị — mở tab game (/) cùng trình duyệt này'}
@@ -103,26 +105,26 @@ export default function AdminPage() {
       {/* ── TAB 1: KÉO CO ── */}
       {tab === 'tug' && (
         <section className="pml-admin-sec">
-          <h2>🪢 Trận kéo co</h2>
+          <h2><span className="pml-ic"><Users size={18} /></span> Trận kéo co</h2>
           <p>Trạng thái: <b>{PHASE_LABEL[snap?.phase] || '—'}</b>
-            {snap?.paused ? ' · ⏸ Đang tạm dừng' : ''} · Màn {snap?.round || 1} · ❤️ {snap?.likes || 0} tim · 🎁 {snap?.queueLength || 0} quà đang chờ</p>
-          <p>Tỉ số màn: <b>🔴 {teamA?.roundWins || 0} — {teamB?.roundWins || 0} 🔵</b>
+            {snap?.paused ? <> · <span className="pml-ic"><Pause size={14} /></span> Đang tạm dừng</> : ''} · Màn {snap?.round || 1} · <span className="pml-ic"><Heart size={14} /></span> {snap?.likes || 0} tim · <span className="pml-ic"><Gift size={14} /></span> {snap?.queueLength || 0} quà đang chờ</p>
+          <p>Tỉ số màn: <b><span className="pml-dot red" /> {teamA?.roundWins || 0} — {teamB?.roundWins || 0} <span className="pml-dot blue" /></b>
             {' · '}Dây đang ở: <b>{rope > 0.05 ? 'lệch về Đỏ' : rope < -0.05 ? 'lệch về Xanh' : 'giữa'}</b>
             {snap?.phase === 'pulling' ? ` · còn ${Math.max(0, Math.ceil(snap.roundTimeLeft || 0))} giây` : ''}</p>
           <div className="pml-admin-btns">
-            <button onClick={() => postCmd({ cmd: 'start' })}>▶️ Bắt đầu trận / màn sau</button>
-            <button onClick={() => postCmd({ cmd: 'pause' })}>⏸ Tạm dừng</button>
-            <button onClick={() => postCmd({ cmd: 'resume' })}>▶️ Chơi tiếp</button>
-            <button onClick={() => postCmd({ cmd: 'reset' })}>🔄 Trận mới (xóa tỉ số)</button>
+            <button onClick={() => postCmd({ cmd: 'start' })}><span className="pml-ic"><Play size={15} /></span> Bắt đầu trận / màn sau</button>
+            <button onClick={() => postCmd({ cmd: 'pause' })}><span className="pml-ic"><Pause size={15} /></span> Tạm dừng</button>
+            <button onClick={() => postCmd({ cmd: 'resume' })}><span className="pml-ic"><Play size={15} /></span> Chơi tiếp</button>
+            <button onClick={() => postCmd({ cmd: 'reset' })}><span className="pml-ic"><RotateCcw size={15} /></span> Trận mới (xóa tỉ số)</button>
           </div>
-          <h3>🔴 {TEAMS.A.name} — {TEAMS.A.members.map((p) => ({ soldier: '💂', player: '🥷', michelle: '👩' })[p]).join('')} ({teamA?.members?.length || 0} người · 💪 {Math.round(teamA?.pullRate || 0)} lực) · tổng lực kéo {Math.round(teamA?.totalPull || 0)}</h3>
+          <h3><span className="pml-dot red" /> {TEAMS.A.name} — <span className="pml-ic"><User size={14} /><User size={14} /><User size={14} /></span> ({teamA?.members?.length || 0} người · <span className="pml-ic"><Zap size={14} /></span> {Math.round(teamA?.pullRate || 0)} lực) · tổng lực kéo {Math.round(teamA?.totalPull || 0)}</h3>
           {(teamA?.members?.length || 0) === 0 && <p>Chưa có ai — khán giả bình luận A để vào đội Đỏ.</p>}
           <ul className="pml-admin-list">
             {(teamA?.members || []).map((m) => (
               <li key={m.nickname + m.userId}>{m.nickname} · {m.gifts || 0} quà · {Math.round(m.pulls || 0)} lực kéo</li>
             ))}
           </ul>
-          <h3>🔵 {TEAMS.B.name} — {TEAMS.B.members.map((p) => ({ casual: '👱‍♀️', casual2: '👩‍🦰', soldierB: '👨‍🦱' })[p]).join('')} ({teamB?.members?.length || 0} người · 💪 {Math.round(teamB?.pullRate || 0)} lực) · tổng lực kéo {Math.round(teamB?.totalPull || 0)}</h3>
+          <h3><span className="pml-dot blue" /> {TEAMS.B.name} — <span className="pml-ic"><User size={14} /><User size={14} /><User size={14} /></span> ({teamB?.members?.length || 0} người · <span className="pml-ic"><Zap size={14} /></span> {Math.round(teamB?.pullRate || 0)} lực) · tổng lực kéo {Math.round(teamB?.totalPull || 0)}</h3>
           {(teamB?.members?.length || 0) === 0 && <p>Chưa có ai — khán giả bình luận B để vào đội Xanh.</p>}
           <ul className="pml-admin-list">
             {(teamB?.members || []).map((m) => (
@@ -131,26 +133,26 @@ export default function AdminPage() {
           </ul>
           <p className="pml-admin-note">{BALANCE_NOTE}</p>
           {(snap?.streak?.A || snap?.streak?.B) > 0 && (
-            <p>🔥 Chuỗi thắng trận liên tiếp: 🔴 {snap?.streak?.A || 0} — {snap?.streak?.B || 0} 🔵</p>
+            <p><span className="pml-ic"><Flame size={15} /></span> Chuỗi thắng trận liên tiếp: <span className="pml-dot red" /> {snap?.streak?.A || 0} — {snap?.streak?.B || 0} <span className="pml-dot blue" /></p>
           )}
-          <h3>🏆 BXH — ai tặng quà / thả tim nhiều nhất (lưu lại cả phiên)</h3>
+          <h3><span className="pml-ic"><Trophy size={17} /></span> BXH — ai tặng quà / thả tim nhiều nhất (lưu lại cả phiên)</h3>
           {(!snap?.bxh?.gifters?.length && !snap?.bxh?.likers?.length) && <p>Chưa có ai tặng quà hay thả tim — BXH hiện khi có người tặng/thả tim, bảng nhỏ ở góc trái màn hình hiển thị.</p>}
           {(snap?.bxh?.gifters?.length || 0) > 0 && (
             <ul className="pml-admin-list">
               {snap.bxh.gifters.map((g, i) => (
-                <li key={`g${i}`}>🎁 #{i + 1} {g.nickname} · 💪 {Math.round(g.power)} lực · {g.count || 0} quà{g.coins ? ` · 🪙 ${g.coins} xu` : ''}</li>
+                <li key={`g${i}`}><span className="pml-ic"><Gift size={14} /></span> #{i + 1} {g.nickname} · <span className="pml-ic"><Zap size={14} /></span> {Math.round(g.power)} lực · {g.count || 0} quà{g.coins ? <> · <span className="pml-ic"><Coins size={14} /></span> {g.coins} xu</> : ''}</li>
               ))}
             </ul>
           )}
           {(snap?.bxh?.likers?.length || 0) > 0 && (
             <ul className="pml-admin-list">
               {snap.bxh.likers.map((g, i) => (
-                <li key={`l${i}`}>❤️ #{i + 1} {g.nickname} · {g.likes} tim</li>
+                <li key={`l${i}`}><span className="pml-ic"><Heart size={14} /></span> #{i + 1} {g.nickname} · {g.likes} tim</li>
               ))}
             </ul>
           )}
           <div className="pml-admin-btns">
-            <button onClick={() => { postCmd({ cmd: 'resetBxh' }); flash('Đã xóa BXH — bắt đầu lại từ đầu.') }}>🗑️ Xóa BXH (live mới / ngày mới)</button>
+            <button onClick={() => { postCmd({ cmd: 'resetBxh' }); flash('Đã xóa BXH — bắt đầu lại từ đầu.') }}><span className="pml-ic"><Trash2 size={15} /></span> Xóa BXH (live mới / ngày mới)</button>
           </div>
         </section>
       )}
@@ -158,10 +160,10 @@ export default function AdminPage() {
       {/* ── TAB 2: QUÀ & LỰC KÉO ── */}
       {tab === 'gifts' && (
         <section className="pml-admin-sec">
-          <h2>🎁 Quà tặng → Lực kéo</h2>
+          <h2><span className="pml-ic"><Gift size={18} /></span> Quà tặng → Lực kéo</h2>
           <p className="pml-admin-note">Quà thật trên TikTok, chỉ lấy quà dưới 100 xu — quà là cú bùng sức mạnh, 1 món quà to bằng cả đám đông (1 xu = 1 lực, 5 xu = 5, 10 xu = 10, 20 xu = 25, 99 xu = 100). Chạm vào một món quà để mở bảng chi tiết của nó — giống bảng chọn quà trên TikTok. Quà nào không có trong bảng sẽ bị bỏ qua (không tự đoán).</p>
           <GiftMapEditor giftMap={settings.giftMap || {}} onSave={(giftMap) => updateSettings({ giftMap })} onTest={(gift) => { postCmd({ cmd: 'simGift', giftName: gift, nickname: 'Bạn Thử', userId: 'test', text: '' }); flash('Đã gửi thử quà lên màn hiển thị.') }} />
-          <h3>⚖️ Giới hạn cân bằng</h3>
+          <h3><span className="pml-ic"><Scale size={16} /></span> Giới hạn cân bằng</h3>
           <div className="pml-admin-grid">
             <label className="pml-admin-field">1 màn kéo tối đa (giây)
               <input type="number" min="15" max="180" defaultValue={settings.roundSeconds} onBlur={(e) => updateSettings({ roundSeconds: Math.max(15, Number(e.target.value) || 45) })} />
@@ -204,16 +206,16 @@ export default function AdminPage() {
       {/* ── TAB 3: KIỂM THỬ ── */}
       {tab === 'test' && (
         <section className="pml-admin-sec">
-          <h2>🎲 Kiểm thử (không cần live thật)</h2>
+          <h2><span className="pml-ic"><TestTube size={18} /></span> Kiểm thử (không cần live thật)</h2>
           <p className="pml-admin-note">Bấm để giả lập kéo / quà ngay trên màn hiển thị. Chỉ dùng để thử — không phải quà thật từ khán giả.</p>
           <TestPanel phase={snap?.phase} giftMap={settings.giftMap || {}} onDone={() => flash('Đã gửi thử lên màn hiển thị.')} />
-          <h3>💬 Giả bình luận / tim</h3>
+          <h3><span className="pml-ic"><MessageCircle size={16} /></span> Giả bình luận / tim</h3>
           <div className="pml-admin-btns">
-            <button onClick={() => postCmd({ cmd: 'simChat', nickname: 'Bạn Thử', userId: 'test1', text: 'A' })}>💬 Giả: A (vào Đội Đỏ)</button>
-            <button onClick={() => postCmd({ cmd: 'simChat', nickname: 'Bạn Thử 2', userId: 'test2', text: 'B' })}>💬 Giả: B (vào Đội Xanh)</button>
-            <button onClick={() => postCmd({ cmd: 'simChat', nickname: 'Bạn Thử', userId: 'test1', text: 'THAM GIA' })}>💬 Giả: THAM GIA</button>
-            <button onClick={() => postCmd({ cmd: 'simLike', count: 100 })}>❤️ Giả: +100 tim</button>
-            <button onClick={() => postCmd({ cmd: 'simLike', count: 10 })}>🤍 Giả: +10 tim</button>
+            <button onClick={() => postCmd({ cmd: 'simChat', nickname: 'Bạn Thử', userId: 'test1', text: 'A' })}><span className="pml-ic"><MessageCircle size={15} /></span> Giả: A (vào Đội Đỏ)</button>
+            <button onClick={() => postCmd({ cmd: 'simChat', nickname: 'Bạn Thử 2', userId: 'test2', text: 'B' })}><span className="pml-ic"><MessageCircle size={15} /></span> Giả: B (vào Đội Xanh)</button>
+            <button onClick={() => postCmd({ cmd: 'simChat', nickname: 'Bạn Thử', userId: 'test1', text: 'THAM GIA' })}><span className="pml-ic"><MessageCircle size={15} /></span> Giả: THAM GIA</button>
+            <button onClick={() => postCmd({ cmd: 'simLike', count: 100 })}><span className="pml-ic"><Heart size={15} /></span> Giả: +100 tim</button>
+            <button onClick={() => postCmd({ cmd: 'simLike', count: 10 })}><span className="pml-ic"><Heart size={15} /></span> Giả: +10 tim</button>
           </div>
         </section>
       )}
@@ -221,7 +223,7 @@ export default function AdminPage() {
       {/* ── TAB 4: KẾT NỐI ── */}
       {tab === 'connect' && (
         <section className="pml-admin-sec">
-          <h2>🔗 Kết nối TikTok LIVE</h2>
+          <h2><span className="pml-ic"><Plug size={18} /></span> Kết nối TikTok LIVE</h2>
           <p className="pml-admin-note">Game nối với bộ nghe live qua địa chỉ WebSocket. Địa chỉ và mã chỉ lưu trên trình duyệt này, không gửi đi đâu khác.</p>
           <label className="pml-admin-field">Địa chỉ kết nối (dạng wss://…/ws)
             <input type="text" value={wsUrl} onChange={(e) => setWsUrl(e.target.value)} placeholder="vd: ten-app.onrender.com/ws" />
@@ -230,11 +232,11 @@ export default function AdminPage() {
             <input type="password" value={wsKey} onChange={(e) => setWsKey(e.target.value)} placeholder="Mã do bộ nghe live cấp" />
           </label>
           <div className="pml-admin-btns">
-            <button onClick={() => { postCmd({ cmd: 'connect', wsUrl, key: wsKey }); flash('Đang nối… xem trạng thái ở đầu trang.') }}>🔌 Nối ngay</button>
-            <button onClick={() => postCmd({ cmd: 'disconnect' })}>🔌 Ngắt nối</button>
+            <button onClick={() => { postCmd({ cmd: 'connect', wsUrl, key: wsKey }); flash('Đang nối… xem trạng thái ở đầu trang.') }}><span className="pml-ic"><Plug size={15} /></span> Nối ngay</button>
+            <button onClick={() => postCmd({ cmd: 'disconnect' })}><span className="pml-ic"><PlugZap size={15} /></span> Ngắt nối</button>
           </div>
           <p>Trạng thái: <b>{snap?.wsStatus || 'chưa nối'}</b>{snap?.wsDetail ? ` — ${snap.wsDetail}` : ''}</p>
-          <h3>📋 Event gần đây</h3>
+          <h3><span className="pml-ic"><ClipboardList size={16} /></span> Event gần đây</h3>
           {(snap?.wsLog?.length || 0) === 0 && <p className="pml-admin-note">Chưa có event nào. Khi live chạy, quà / bình luận / tim sẽ hiện ở đây.</p>}
           <ul className="pml-admin-list mono">
             {(snap?.wsLog || []).map((l, i) => <li key={i}><span className="dim">{l.at}</span> {l.line}</li>)}
@@ -256,7 +258,7 @@ export default function AdminPage() {
       {/* ── TAB 5: CÀI ĐẶT ── */}
       {tab === 'settings' && (
         <section className="pml-admin-sec">
-          <h2>⚙️ Cài đặt</h2>
+          <h2><span className="pml-ic"><Settings size={18} /></span> Cài đặt</h2>
           <div className="pml-admin-grid">
             <label className="pml-admin-field">ID TikTok của streamer (để dùng lệnh DỪNG / TIẾP / +30S)
               <input type="text" defaultValue={settings.streamerId || ''} placeholder="vd: ten_tiktok_cua_ban" onBlur={(e) => updateSettings({ streamerId: e.target.value.trim() })} />
@@ -319,10 +321,10 @@ function GiftMapEditor({ giftMap, onSave, onTest }) {
           const price = giftPrice(gift)
           return (
             <button key={gift} className={`pml-gift-tile ${sel === gift ? 'active' : ''}`} onClick={() => setSelected(sel === gift ? null : gift)}>
-              <span className="gi">{giftIcon(gift)}</span>
+              <span className="gi"><GiftIcon gift={gift} size={28} /></span>
               <span className="gn">{gift}</span>
-              {price != null && <span className="gp">🪙 {price} xu</span>}
-              <span className="ga">💪 {power} lực kéo</span>
+              {price != null && <span className="gp"><span className="pml-ic"><Coins size={13} /></span> {price} xu</span>}
+              <span className="ga"><span className="pml-ic"><Zap size={13} /></span> {power} lực kéo</span>
             </button>
           )
         })}
@@ -330,11 +332,11 @@ function GiftMapEditor({ giftMap, onSave, onTest }) {
       {sel && selPower != null && (
         <div className="pml-gift-sheet">
           <div className="gs-top">
-            <span className="gs-icon">{giftIcon(sel)}</span>
+            <span className="gs-icon"><GiftIcon gift={sel} size={36} /></span>
             <div>
               <div className="gs-name">{sel}</div>
-              <div className="gs-ability">💪 {selPower} lực kéo</div>
-              {giftPrice(sel) != null && <div className="gs-price">🪙 {giftPrice(sel)} xu — {giftTier(giftPrice(sel))}</div>}
+              <div className="gs-ability"><span className="pml-ic"><Zap size={14} /></span> {selPower} lực kéo</div>
+              {giftPrice(sel) != null && <div className="gs-price"><span className="pml-ic"><Coins size={14} /></span> {giftPrice(sel)} xu — {giftTier(giftPrice(sel))}</div>}
             </div>
             <button className="gs-x" onClick={() => setSelected(null)}>✕</button>
           </div>
@@ -346,16 +348,16 @@ function GiftMapEditor({ giftMap, onSave, onTest }) {
             <input type="number" min="0" max="100" key={`p-${sel}`} defaultValue={selPower} onBlur={(e) => setPower(sel, e.target.value)} />
           </label>
           <div className="pml-admin-btns">
-            <button onClick={() => onTest(sel)}>🎁 Thử tặng quà này</button>
+            <button onClick={() => onTest(sel)}><span className="pml-ic"><Gift size={15} /></span> Thử tặng quà này</button>
             <button onClick={() => removeGift(sel)}>✕ Xóa quà này</button>
           </div>
         </div>
       )}
       <div className="pml-admin-addrow">
-        <span style={{ fontSize: 26, alignSelf: 'center' }}>{giftIcon(newGift)}</span>
+        <span style={{ display: 'inline-flex', alignSelf: 'center' }}><GiftIcon gift={newGift} size={26} /></span>
         <input value={newGift} onChange={(e) => setNewGift(e.target.value)} placeholder="Tên quà mới, vd: Bánh" />
         <input type="number" min="0" max="100" value={newPower} onChange={(e) => setNewPower(e.target.value)} placeholder="Lực kéo" style={{ maxWidth: 90 }} />
-        <button onClick={addGift}>➕ Thêm</button>
+        <button onClick={addGift}><span className="pml-ic"><Plus size={15} /></span> Thêm</button>
       </div>
       <button className="pml-admin-link" onClick={() => { onSave({ ...DEFAULT_SETTINGS.giftMap }); setSelected(null) }}>
         ↩ Khôi phục bảng mặc định
@@ -374,12 +376,12 @@ function TestPanel({ phase, giftMap, onDone }) {
   return (
     <div>
       {!pulling && <p className="pml-admin-note">Lực kéo chỉ có tác dụng khi đang kéo co — bấm “Bắt đầu trận / màn sau” ở tab Kéo co trước.</p>}
-      <h4>🪢 Chọn đội kéo</h4>
+      <h4><span className="pml-ic"><Users size={15} /></span> Chọn đội kéo</h4>
       <div className="pml-admin-btns">
-        <button className={teamId === 'A' ? 'active' : ''} onClick={() => setTeamId('A')}>🔴 Đội Đỏ</button>
-        <button className={teamId === 'B' ? 'active' : ''} onClick={() => setTeamId('B')}>🔵 Đội Xanh</button>
+        <button className={teamId === 'A' ? 'active' : ''} onClick={() => setTeamId('A')}><span className="pml-dot red" /> Đội Đỏ</button>
+        <button className={teamId === 'B' ? 'active' : ''} onClick={() => setTeamId('B')}><span className="pml-dot blue" /> Đội Xanh</button>
       </div>
-      <h4>💪 Lực kéo</h4>
+      <h4><span className="pml-ic"><Zap size={15} /></span> Lực kéo</h4>
       <div className="pml-admin-btns">
         {POWER_CHOICES.map((p) => (
           <button key={p} className={power === p ? 'active' : ''} onClick={() => setPower(p)}>{p} lực</button>
@@ -390,14 +392,14 @@ function TestPanel({ phase, giftMap, onDone }) {
       </label>
       <div className="pml-admin-btns">
         <button disabled={!pulling} onClick={() => { postCmd({ cmd: 'inject', teamId, power, sender }); onDone() }}>
-          💪 Thử kéo {power} lực cho {teamId === 'A' ? 'Đội Đỏ' : 'Đội Xanh'}
+          <span className="pml-ic"><Zap size={15} /></span> Thử kéo {power} lực cho {teamId === 'A' ? 'Đội Đỏ' : 'Đội Xanh'}
         </button>
         <button disabled={!pulling} onClick={() => {
           const giftName = Object.entries(giftMap).find(([, v]) => v === power)?.[0] || 'Hoa hồng'
           postCmd({ cmd: 'simGift', giftName, nickname: sender, userId: 'test', text: teamId })
           onDone()
         }}>
-          🎁 Thử qua đường quà (kèm chống trùng + xếp hàng)
+          <span className="pml-ic"><Gift size={15} /></span> Thử qua đường quà (kèm chống trùng + xếp hàng)
         </button>
       </div>
     </div>

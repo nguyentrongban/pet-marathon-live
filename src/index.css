@@ -49,6 +49,15 @@ input, select { font-family: inherit; }
 .pml-top-actions { display: flex; gap: 8px; align-items: center; }
 .pml-dot { width: 11px; height: 11px; border-radius: 50%; background: #94a3b8; border: 2px solid rgba(255,255,255,.7); box-shadow: 0 0 0 3px rgba(0,0,0,.25); }
 .pml-dot.on { background: #34c759; box-shadow: 0 0 10px #34c759, 0 0 0 3px rgba(0,0,0,.25); }
+.pml-dot.sm { width: 8px; height: 8px; border-width: 1.5px; box-shadow: 0 0 0 2px rgba(0,0,0,.25); }
+.pml-dot.sm.on { box-shadow: 0 0 8px #34c759, 0 0 0 2px rgba(0,0,0,.25); }
+/* Chấm màu đội (Lucide thay emoji 🔴🔵). */
+.pt-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
+.pt-dot.red { background: #e03131; }
+.pt-dot.blue { background: #1971c2; }
+/* Icon Lucide trong chữ: căn giữa dòng cho khỏi lệch. */
+.pml-app svg.lucide { vertical-align: -2px; }
+.pml-logo-ic { vertical-align: -3px; }
 .pml-iconbtn, .pml-helpbtn {
   border: 1px solid rgba(255,255,255,.25); border-radius: 999px;
   background: rgba(10, 40, 28, .55); color: #fff; backdrop-filter: blur(6px);
@@ -68,11 +77,13 @@ input, select { font-family: inherit; }
 }
 .pml-team.red.leading { border-color: rgba(255, 80, 80, .9); box-shadow: 0 4px 18px rgba(255, 60, 60, .45); }
 .pml-team.blue.leading { border-color: rgba(80, 160, 255, .9); box-shadow: 0 4px 18px rgba(60, 140, 255, .45); }
-.pml-team .pt-emoji { font-size: 15px; }
 .pml-team .pt-name { font-weight: 900; font-size: 13.5px; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
-.pml-team .pt-pets { font-size: 14px; letter-spacing: 1px; }
-.pml-team .pml-stars { font-size: 11px; letter-spacing: 1px; }
-.pml-team .pt-count { font-size: 11px; font-weight: 800; opacity: .9; }
+.pml-team .pt-pets { display: flex; gap: 3px; align-items: center; }
+.pml-team .pt-pets .pt-pet { opacity: .95; }
+.pml-team .pml-stars { display: flex; gap: 2px; align-items: center; }
+.pml-team .pml-stars .star-on { color: #ffd60a; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+.pml-team .pml-stars .star-off { color: rgba(255,255,255,.45); }
+.pml-team .pt-count { font-size: 11px; font-weight: 800; opacity: .9; display: flex; gap: 3px; align-items: center; justify-content: center; }
 .pml-vs {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
   min-width: 52px; text-align: center;
@@ -98,8 +109,8 @@ input, select { font-family: inherit; }
 .rm-center { position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: #fff; opacity: .9; }
 .rm-flag {
   position: absolute; top: 50%; transform: translate(-50%, -50%);
-  font-size: 20px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6));
-  transition: left .25s linear;
+  color: #ff3b30; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6));
+  transition: left .25s linear; display: flex;
 }
 .rm-labels {
   display: flex; justify-content: space-between; margin-top: 3px;
@@ -204,13 +215,23 @@ input, select { font-family: inherit; }
   pointer-events: none; text-align: center;
 }
 .pml-gift-box { position: relative; }
-.pml-gift-emoji {
-  font-size: 64px; line-height: 1; display: inline-block;
+/* Sticker quà (icon Lucide đúng món quà): nảy lên + lắc nhẹ như sticker,
+   viền trắng + bóng cho nổi trên nền 3D. */
+.pml-gift-sticker {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 92px; height: 92px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #ffe9a8 70%);
+  color: #b45309; border: 3px solid #fff;
   filter: drop-shadow(0 8px 18px rgba(0,0,0,.5));
-  animation: pml-gift-pop .55s cubic-bezier(.34, 1.56, .64, 1);
+  animation: pml-gift-pop .55s cubic-bezier(.34, 1.56, .64, 1), pml-sticker-wiggle 1.6s ease-in-out .6s infinite;
+}
+@keyframes pml-sticker-wiggle {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(5deg); }
 }
 .pml-gift-spark {
-  position: absolute; top: -8px; right: -14px; font-size: 26px; opacity: 0;
+  position: absolute; top: -8px; right: -14px; color: #ffd60a; opacity: 0;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.5));
   animation: pml-spark-burst .8s ease-out .35s;
 }
 .pml-gift-name {
@@ -258,7 +279,15 @@ input, select { font-family: inherit; }
   position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%);
   display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center;
 }
-.pml-fireworks-name .fw-crown { font-size: 40px; line-height: 1; animation: pml-gift-pop .5s cubic-bezier(.34, 1.56, .64, 1); }
+.pml-fireworks-name .fw-crown { display: flex; align-items: center; justify-content: center; gap: 8px; color: #ffd60a; line-height: 1; animation: pml-gift-pop .5s cubic-bezier(.34, 1.56, .64, 1); }
+.pml-fireworks-name .fw-crown .fw-gift-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 84px; height: 84px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #ffe9a8 70%);
+  color: #b45309; border: 3px solid #fff;
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,.5));
+  animation: pml-sticker-wiggle 1.6s ease-in-out .2s infinite;
+}
 .pml-fireworks-name .fw-name {
   font-size: 30px; font-weight: 900; letter-spacing: .3px;
   background: linear-gradient(180deg, #fff7ae, #ffd60a 60%, #ff9f1c);
@@ -283,8 +312,16 @@ input, select { font-family: inherit; }
 .pml-bxh-title { font-size: 12px; font-weight: 900; letter-spacing: .5px; margin-bottom: 4px; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
 .pml-bxh-sec { margin-top: 5px; }
 .pml-bxh-head { font-size: 10.5px; font-weight: 800; opacity: .85; margin-bottom: 2px; }
-.pml-bxh-row { display: flex; gap: 5px; align-items: baseline; font-size: 12px; line-height: 1.45; }
-.pml-bxh-rank { font-size: 11px; }
+.pml-bxh-row { display: flex; gap: 5px; align-items: center; font-size: 12px; line-height: 1.45; }
+/* Hạng BXH: số trong vòng tròn (vàng/bạc/đồng) thay cho emoji 🥇🥈🥉. */
+.pml-bxh-rank {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%; flex: none;
+  font-size: 10px; font-weight: 900; color: #3f2d06;
+}
+.pml-bxh-rank.r1 { background: linear-gradient(180deg, #ffe066, #f59f00); }
+.pml-bxh-rank.r2 { background: linear-gradient(180deg, #e9ecef, #adb5bd); }
+.pml-bxh-rank.r3 { background: linear-gradient(180deg, #e8a87c, #b0793f); }
 .pml-bxh-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22vw; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
 .pml-bxh-val { margin-left: auto; font-weight: 800; color: #ffe08a; white-space: nowrap; }
 
@@ -381,3 +418,10 @@ input, select { font-family: inherit; }
 @media (max-width: 420px) {
   .pml-countdown { font-size: 76px; }
 }
+
+/* Icon Lucide inline + chấm màu đội (AdminPage, thay emoji). */
+.pml-dot { display: inline-block; vertical-align: -1px; }
+.pml-dot.red { background: #e03131; border-color: transparent; box-shadow: none; }
+.pml-dot.blue { background: #1971c2; border-color: transparent; box-shadow: none; }
+.pml-ic { display: inline-flex; vertical-align: -3px; }
+.pml-ic svg { display: block; }
