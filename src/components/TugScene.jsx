@@ -720,6 +720,9 @@ export default function TugScene({ liveRef }) {
     // ── Tải nhân vật người ──
     const modelCache = new Map() // file -> { scene, clips, rig }
     const clipPool = new Map() // tên clip thường -> clip Mixamo (dùng chung giữa các file)
+    const realBuildTries = new Map() // file -> số lần dựng thật thất bại (skeleton hỏng)
+    const healTries = new Map() // key "A-2" -> số lần tự chữa nhân vật bị lật
+    const forceFallbackKeys = new Set() // key đã chữa 2 lần vẫn hỏng -> giữ người dự phòng
     const gltfLoader = new GLTFLoader()
     gltfLoader.setMeshoptDecoder(MeshoptDecoder) // player.glb nén meshopt
     const uniqueFiles = [...new Set(Object.values(HUMAN_SLOTS).flat().map((s) => s.file))]
@@ -794,28 +797,50 @@ export default function TugScene({ liveRef }) {
       if (model) {
         const clone = cloneModel(model.scene)
         applyVariant(clone, slot.variant)
-        const inner = new THREE.Group()
-        inner.rotation.y = MODEL_FACE_Y[teamId] * FACE_SIGN[slot.file]
-        // Co mọi nhân vật về cùng chiều cao 1,75 (file gốc khác đơn vị nhau).
-        inner.scale.setScalar(HUMAN_HEIGHT / (BASE_HEIGHT[slot.file] || 1.75))
-        inner.add(clone)
-        group.add(inner)
+        // Kiểm tra skeleton của bản clone NGAY lúc dựng: nếu
+        // SkeletonUtils.clone nối sai xương (mesh skin tham chiếu xương
+        // ngoài bản clone) thì nhân vật xẹp thành 1 cục nhỏ trên đất hoặc
+        // biến mất — Mia chỉ có 1 mesh duy nhất nên biến mất hoàn toàn.
+        // Hỏng thì trả về người dự phòng (nhìn thấy được còn hơn biến
+        // mất), lần sau thử dựng lại (giới hạn 3 lần).
+        const cloneIds = new Set()
+        clone.traverse((o) => cloneIds.add(o.id))
+        let skeletonOk = true
         clone.traverse((o) => {
-          if (o.isMesh) {
-            o.castShadow = true
-            // Skinned mesh lúc mới tải có bounding sphere chưa cập nhật theo
-            // xương nên dễ bị cắt khỏi khung hình — tắt culling cho chắc.
-            o.frustumCulled = false
+          if (!skeletonOk) return
+          if (o.isSkinnedMesh && o.skeleton) {
+            for (const b of o.skeleton.bones) if (!cloneIds.has(b.id)) { skeletonOk = false; break }
           }
         })
-        const mixer = new THREE.AnimationMixer(clone)
         const bones = findBones(clone, model.rig)
-        const hipsBaseY = bones.hips ? bones.hips.position.y : 0.95
-        return {
-          group, mixer, clips: model.clips, rig: model.rig, bones, hipsBaseY,
-          currentClip: null, currentAction: null, isFallback: false,
-          poseWeight: 0, slotIdx, faceSign: FACE_SIGN[slot.file] || 1,
-          mudSpots: makeMudSpots(group, slotIdx),
+        let bonesOk = true
+        for (const b of Object.values(bones)) if (!b) { bonesOk = false; break }
+        if (!skeletonOk || !bonesOk) {
+          console.warn('[CHAR-BUILD-BAD]', slot.file, 'skeletonOk:', skeletonOk, 'bonesOk:', bonesOk)
+          realBuildTries.set(slot.file, (realBuildTries.get(slot.file) || 0) + 1)
+        } else {
+          const inner = new THREE.Group()
+          inner.rotation.y = MODEL_FACE_Y[teamId] * FACE_SIGN[slot.file]
+          // Co mọi nhân vật về cùng chiều cao 1,75 (file gốc khác đơn vị nhau).
+          inner.scale.setScalar(HUMAN_HEIGHT / (BASE_HEIGHT[slot.file] || 1.75))
+          inner.add(clone)
+          group.add(inner)
+          clone.traverse((o) => {
+            if (o.isMesh) {
+              o.castShadow = true
+              // Skinned mesh lúc mới tải có bounding sphere chưa cập nhật theo
+              // xương nên dễ bị cắt khỏi khung hình — tắt culling cho chắc.
+              o.frustumCulled = false
+            }
+          })
+          const mixer = new THREE.AnimationMixer(clone)
+          const hipsBaseY = bones.hips ? bones.hips.position.y : 0.95
+          return {
+            group, mixer, clips: model.clips, rig: model.rig, bones, hipsBaseY,
+            currentClip: null, currentAction: null, isFallback: false,
+            poseWeight: 0, slotIdx, faceSign: FACE_SIGN[slot.file] || 1,
+            mudSpots: makeMudSpots(group, slotIdx),
+          }
         }
       }
       const human = makeFallbackHuman(TEAM_COLORS[teamId])
@@ -825,11 +850,29 @@ export default function TugScene({ liveRef }) {
 
     const humanMeshes = new Map() // key "A-0" -> entry
     const TEAM_COLORS = { A: 0xe03131, B: 0x1971c2 }
+    // Người dự phòng (dùng khi file chưa tải / dựng thật thất bại).
+    const buildFallbackEntry = (teamId, slotIdx) => {
+      const group = new THREE.Group()
+      group.add(makeFallbackHuman(TEAM_COLORS[teamId]))
+      return { group, mixer: null, clips: null, rig: null, bones: null, hipsBaseY: 0.95, currentClip: null, currentAction: null, isFallback: true, poseWeight: 0, slotIdx, faceSign: 1, mudSpots: makeMudSpots(group, slotIdx) }
+    }
     const getHumanMesh = (teamId, slotIdx) => {
       const key = `${teamId}-${slotIdx}`
       const slot = HUMAN_SLOTS[teamId][slotIdx]
       let entry = humanMeshes.get(key)
-      if (entry?.isFallback && modelCache.has(slot.file)) {
+      // Đã chữa 2 lần vẫn hỏng -> giữ người dự phòng, khỏi dựng đi dựng lại.
+      if (forceFallbackKeys.has(key)) {
+        if (!entry || !entry.isFallback) {
+          if (entry) scene.remove(entry.group)
+          entry = buildFallbackEntry(teamId, slotIdx)
+          scene.add(entry.group)
+          humanMeshes.set(key, entry)
+        }
+        return entry
+      }
+      // Đổi dự phòng -> thật khi model về tới (giới hạn 3 lần thử để
+      // khỏi tháo/dựng vô hạn nếu file đó dựng thật cứ hỏng).
+      if (entry?.isFallback && modelCache.has(slot.file) && (realBuildTries.get(slot.file) || 0) < 3) {
         scene.remove(entry.group)
         humanMeshes.delete(key)
         entry = null
@@ -941,6 +984,7 @@ export default function TugScene({ liveRef }) {
 
     let raf = 0
     let lastT = performance.now()
+    let lastHealthCheck = 0
     let smoothRopeX = 0
     let smoothRopeY = ROPE_Y
     let lastPhase = ''
@@ -987,7 +1031,7 @@ export default function TugScene({ liveRef }) {
     }
 
     const animate = (t) => {
-      raf = requestAnimationFrame(animate)
+    raf = requestAnimationFrame(animate)
       const dt = Math.min(0.1, (t - lastT) / 1000)
       lastT = t
       const time = t / 1000
@@ -1214,7 +1258,8 @@ export default function TugScene({ liveRef }) {
           // Model 3D tải chậm (khán giả vào lúc model chưa tải xong thì lúc
           // đầu chỉ là người dự phòng) — model về tới thì đổi sang người
           // thật, giữ nguyên model đã bốc (không bốc lại cho khỏi đổi mặt).
-          if (entry.isFallback && slot.modelSlot && modelCache.has(slot.modelSlot.file)) {
+          // Giới hạn 3 lần thử như người mẫu (tránh tháo/dựng vô hạn).
+          if (entry.isFallback && slot.modelSlot && modelCache.has(slot.modelSlot.file) && (realBuildTries.get(slot.modelSlot.file) || 0) < 3) {
             slot.holder.remove(entry.group)
             slot.entry = buildHumanEntry(teamId, slot.modelSlot, i)
             slot.holder.add(slot.entry.group)
@@ -1309,6 +1354,29 @@ export default function TugScene({ liveRef }) {
           c.mesh.rotation.z += c.spin * dt
           c.mesh.rotation.x += c.spin * 0.7 * dt
           c.mesh.material.opacity = Math.max(0, Math.min(1, c.life))
+        }
+      }
+
+      // ── Tự chữa nhân vật bị lật / biến mất ──
+      // Hông Mixamo lúc nghỉ ≈ -1,5 rad, kéo co -1,6, múa cũng trong
+      // khoảng này; nếu hông xoay quá giới hạn (tích lũy góc do clip
+      // không reset xương, hoặc NaN) thì nhân vật đã lật xuống đất — dựng
+      // lại nhân vật đó từ model đã tải. Kiểm tra 2 giây/lần, tối đa 2
+      // lần/người — quá thì giữ người dự phòng (tránh dựng vô hạn).
+      if (time - lastHealthCheck > 2) {
+        lastHealthCheck = time
+        for (const [key, e] of humanMeshes) {
+          if (e.isFallback || !e.bones?.hips) continue
+          const hr = e.bones.hips.rotation
+          const bad = !Number.isFinite(hr.x) || !Number.isFinite(hr.y) || !Number.isFinite(hr.z)
+            || hr.x < -4 || hr.x > 2
+          if (!bad) continue
+          const n = (healTries.get(key) || 0) + 1
+          healTries.set(key, n)
+          console.warn('[CHAR-HEAL]', key, 'hips=', hr.toArray().slice(0, 3).map((v) => +v.toFixed(2)), 'lần', n)
+          scene.remove(e.group)
+          humanMeshes.delete(key)
+          if (n >= 2) forceFallbackKeys.add(key)
         }
       }
 
