@@ -5,11 +5,12 @@
 // bằng 100 người, tắt dần) · tim = +thời gian (1 người đủ 100 tim → +10s).
 import assert from 'node:assert'
 import { createSeqTracker, normalizeEvent, parseCommand } from '../src/game/adapter.js'
+import { codeTokenToCode, countryInfo, detectCountry, flagEmojiToCode, flagFor } from '../src/game/countries.js'
 import {
   DEFAULT_SETTINGS, GiftEngine, MEMBER_TYPES, TEAMS, advance, applyLikes,
-  applyPull, clearBxh, createMatch, endRound, findMember, giftBoost, giftPrice, giftTier,
+  applyPull, clearBxh, countryLeader, createMatch, endRound, findMember, giftBoost, giftPrice, giftTier,
   giftTeam, joinTeam, migrateGiftMap, parseTeamJoin, pushToast, startMatch, startRound,
-  teamStrength, tick, topGifters, topLikers, visibleMembers,
+  teamStrength, tick, topCountries, topGifters, topLikers, visibleMembers,
 } from '../src/game/engine.js'
 
 let pass = 0, fail = 0
@@ -589,6 +590,102 @@ test('toast vào xem: hiện 2 giây, ai vào sau thì đổi chữ (không xế
   assert.equal(fx[0].text, '👋 Minh vừa vào xem!')
   step(s, 2.5)
   assert.equal(s.effects.filter((e) => e.kind === 'toast').length, 0, 'quá 2 giây thì toast mất')
+})
+
+// ── 17. Cờ quốc gia: quà tính theo nước, nước dẫn đầu ×1,5 lực kéo ───────
+test('cờ emoji trong bình luận/tên → đúng mã nước', () => {
+  assert.equal(flagEmojiToCode('🇻🇳 cố lên!'), 'VN', 'cờ VN trong câu dài vẫn nhận')
+  assert.equal(flagEmojiToCode('cố lên 🇰🇷'), 'KR')
+  assert.equal(flagEmojiToCode('hello'), null, 'không có cờ thì null')
+  assert.equal(flagEmojiToCode('🇽🇽'), null, 'cờ nước lạ (không trong bảng) thì null')
+  assert.equal(detectCountry('🇻🇳 cố lên', ''), 'VN')
+  assert.equal(detectCountry('', 'Lan 🇰🇷'), 'KR', 'cờ trong TÊN người tặng cũng tính')
+  assert.equal(detectCountry('hello', 'Lan'), null)
+})
+
+test('mã nước gõ tay: chỉ tính khi bình luận chỉ có đúng mã đó', () => {
+  assert.equal(codeTokenToCode('VN'), 'VN')
+  assert.equal(codeTokenToCode('vn'), 'VN', 'chữ thường cũng tính')
+  assert.equal(codeTokenToCode('VN cố lên'), null, 'câu dài không tính mã (tránh nhận nhầm)')
+  assert.equal(codeTokenToCode('in love'), null, '"in love" không được nhận thành Ấn Độ')
+  assert.equal(codeTokenToCode('XX'), null, 'mã lạ thì null')
+  assert.equal(detectCountry('VN', ''), 'VN')
+  assert.equal(detectCountry('US', ''), 'US')
+  assert.equal(countryInfo('VN').flag, '🇻🇳')
+  assert.equal(countryInfo('VN').name, 'Việt Nam')
+  assert.equal(countryInfo('XX'), null)
+  assert.equal(flagFor('KR'), '🇰🇷')
+  assert.equal(flagFor('XX'), '🌍')
+})
+
+test('BXH quốc gia: quà tính theo nước, xếp top 3 đúng thứ tự + có cờ/tên', () => {
+  const s = freshMatch()
+  applyPull(s, 'A', 10, { nickname: 'An', userId: 'an', country: 'US' }, 'rosa')
+  applyPull(s, 'A', 100, { nickname: 'Hoa', userId: 'hoa', country: 'VN' }, 'hạc giấy')
+  applyPull(s, 'B', 25, { nickname: 'Min', userId: 'min', country: 'KR' }, 'nước hoa')
+  const top = topCountries(s, 3)
+  assert.equal(top.length, 3)
+  assert.equal(top[0].code, 'VN', 'VN 100 lực phải đứng đầu')
+  assert.equal(top[0].power, 100)
+  assert.equal(top[0].flag, '🇻🇳')
+  assert.equal(top[0].name, 'Việt Nam')
+  assert.equal(top[1].code, 'KR')
+  assert.equal(top[2].code, 'US')
+  assert.equal(countryLeader(s).code, 'VN', 'nước dẫn đầu là VN')
+})
+
+test('nước dẫn đầu: quà của nước đó ×1,5, nước khác không được thưởng', () => {
+  const s = freshMatch()
+  // Món đầu (chưa có nước dẫn đầu) không được thưởng.
+  const r1 = applyPull(s, 'A', 10, { nickname: 'Hoa', userId: 'hoa', country: 'VN' }, 'rosa')
+  assert.equal(r1.effect, 10, 'chưa có nước dẫn đầu thì không thưởng')
+  assert.equal(r1.countryBonus, false)
+  // VN đã dẫn đầu → quà tiếp của VN ×1,5.
+  const r2 = applyPull(s, 'A', 10, { nickname: 'Hoa', userId: 'hoa', country: 'VN' }, 'rosa')
+  assert.equal(r2.effect, 15, 'quà của nước dẫn đầu ×1,5')
+  assert.equal(r2.countryBonus, true)
+  assert.equal(r2.country, 'VN')
+  // Quà của nước khác không được thưởng.
+  const r3 = applyPull(s, 'B', 10, { nickname: 'John', userId: 'john', country: 'US' }, 'rosa')
+  assert.equal(r3.effect, 10, 'quà của nước không dẫn đầu không được thưởng')
+  assert.equal(r3.countryBonus, false)
+  // BXH quốc gia ghi lực CUỐI CÙNG (đã nhân hệ số) nên VN củng cố vị trí.
+  assert.equal(topCountries(s, 3)[0].code, 'VN')
+  assert.equal(topCountries(s, 3)[0].power, 25, 'VN 10 + 15 = 25')
+  assert.equal(topCountries(s, 3)[1].power, 10, 'US 10')
+})
+
+test('hiệu ứng quà mang theo cờ nước + Xóa BXH xóa luôn BXH quốc gia', () => {
+  const s = freshMatch()
+  applyPull(s, 'A', 1, { nickname: 'Hoa', userId: 'hoa', country: 'VN' }, 'hoa hồng')
+  let fx = s.effects.filter((e) => e.kind === 'gift').pop()
+  assert.equal(fx.country, 'VN', 'hiệu ứng quà phải mang mã nước để hiện cờ')
+  assert.equal(fx.countryBonus, false, 'món đầu chưa có nước dẫn đầu')
+  applyPull(s, 'A', 10, { nickname: 'Hoa', userId: 'hoa', country: 'VN' }, 'rosa')
+  fx = s.effects.filter((e) => e.kind === 'gift').pop()
+  assert.equal(fx.countryBonus, true, 'quà của nước dẫn đầu thì hiệu ứng đánh dấu thưởng')
+  // Nhớ nước theo người: quà sau không kèm nước vẫn tính cho VN.
+  const r = applyPull(s, 'A', 10, { nickname: 'Hoa', userId: 'hoa' }, 'rosa')
+  assert.equal(r.country, 'VN', 'đã chọn nước rồi thì quà sau tự tính cho nước đó')
+  assert.equal(r.countryBonus, true)
+  clearBxh(s)
+  assert.equal(topCountries(s, 3).length, 0, 'xóa BXH thì BXH quốc gia cũng hết')
+  assert.equal(countryLeader(s), null)
+})
+
+test('quà qua GiftEngine vẫn mang nước sang hiệu ứng + BXH; kéo thử thì không', () => {
+  const s = freshMatch()
+  const eng = new GiftEngine(s)
+  eng.receive({ id: 'g1', giftName: 'hạc giấy', nickname: 'Hoa', userId: 'hoa', text: 'A', country: 'KR' })
+  const res = eng.process(s.now + 1)
+  assert.ok(res.ok, 'quà phải được xử lý')
+  assert.equal(res.country, 'KR', 'quà qua hàng đợi vẫn mang nước')
+  const fx = s.effects.filter((e) => e.kind === 'gift').pop()
+  assert.equal(fx.country, 'KR', 'hiệu ứng quà mang cờ Hàn Quốc')
+  assert.equal(topCountries(s, 3)[0].code, 'KR')
+  // Kéo thử (không phải quà) không được tính cho nước nào.
+  applyPull(s, 'A', 25, { nickname: 'Admin thử', userId: 'admin', country: 'VN' }, '', { gift: false })
+  assert.equal(topCountries(s, 3).length, 1, 'kéo thử không lên BXH quốc gia')
 })
 
 console.log('\n🪢 KÉO CO LIVE — test logic kéo co (luật v2: số đông vs quà, tim = giờ)')
