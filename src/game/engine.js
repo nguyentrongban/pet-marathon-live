@@ -598,6 +598,12 @@ export function startMatch(state) {
   state.round = 1
   state.matchWinner = null
   state.luckyStar = null
+  // Hết 1 trận (3 màn, phân thắng thua) → reset đội tỉnh về bảng trống.
+  // Trận sau bình luận tỉnh mới sẽ chọn lại 2 tỉnh đấu từ đầu (tỉnh cũ
+  // không dính lại trận sau). BXH (quà/tim/tỉnh) thì GIỮ NGUYÊN — BXH
+  // chỉ reset khi tắt live (xem loadBxh trong useTugOfWar.js).
+  state.provinceUsers = {}
+  state.provinceTeams = { A: null, B: null }
   startRound(state)
   pushFeed(state, 'info', '🪢 Trận kéo co mới bắt đầu! Bình luận A (Đỏ) hoặc B (Xanh) để chọn đội!')
 }

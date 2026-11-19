@@ -544,6 +544,25 @@ test('BXH giữ lại qua màn mới + trận mới (chỉ xóa khi bấm Xóa B
   assert.equal(topLikers(s, 3).length, 0)
 })
 
+test('hết trận (3 màn) thì đội tỉnh reset về trống, BXH vẫn giữ', () => {
+  const s = freshMatch()
+  // 2 tỉnh vào đấu ở màn 1
+  joinProvince(s, 'hanoi', 'Lan', 'lan')
+  joinProvince(s, 'hcm', 'Hoa', 'hoa')
+  startRound(s) // syncProvinceTeams: 2 tỉnh thành 2 đội
+  assert.ok(s.provinceTeams.A && s.provinceTeams.B, 'màn 1 phải có 2 tỉnh đấu')
+  assert.deepEqual([s.provinceTeams.A, s.provinceTeams.B].sort(), ['hanoi', 'hcm'].sort())
+  // Có quà để BXH tỉnh có số liệu (bỏ qua đếm ngược như freshMatch)
+  s.phase = 'pulling'
+  applyPull(s, 'A', 10, { nickname: 'Hoa', userId: 'hoa' }, 'rosa')
+  // Trận mới: đội tỉnh về trống (bảng trống), BXH giữ nguyên
+  startMatch(s)
+  assert.deepEqual(s.provinceTeams, { A: null, B: null }, 'trận mới phải về bảng trống')
+  assert.deepEqual(s.provinceUsers, {}, 'người ủng hộ tỉnh cũ không dính lại trận sau')
+  assert.equal(topGifters(s, 3)[0].nickname, 'Hoa', 'BXH quà vẫn giữ qua trận mới')
+  assert.equal(topProvinces(s, 3).length, 1, 'BXH tỉnh vẫn giữ qua trận mới')
+})
+
 // ── 15. Hiệu ứng tặng quà: nhỏ = hộp quà mở, to = pháo hoa ─────────────────
 test('quà nhỏ (<25 lực) hiện hiệu ứng hộp quà, quà to (≥25) hiện pháo hoa', () => {
   const s = freshMatch()

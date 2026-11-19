@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   DEFAULT_SETTINGS, GiftEngine, TEAMS, advance, applyLikes, applyPull,
   clearBxh, provinceLeader, createMatch, giftIcon, joinProvince, joinTeam, migrateGiftMap, pushToast,
-  startMatch, startRound, topProvinces, topProvincesByComments, topGifters, topLikers,
+  startMatch, startRound, syncProvinceTeams, topProvinces, topProvincesByComments, topGifters, topLikers,
 } from './engine'
 import { provinceInfo, detectProvince } from './provinces'
 import { createSeqTracker, normalizeEvent, parseCommand } from './adapter'
@@ -20,10 +20,19 @@ const WS_KEY = 'pml-ws-v1'
 const BXH_KEY = 'pml-bxh-v1' // BXH (ai tặng quà / thả tim nhiều nhất) — lưu lại qua các màn/trận + tải lại trang
 
 // BXH lưu ở localStorage trên màn hiển thị (cùng máy với game): tải lại
-// trang vẫn còn, chỉ mất khi streamer bấm Xóa BXH ở Admin.
+// trang vẫn còn, chỉ mất khi streamer bấm Xóa BXH ở Admin — hoặc khi tắt
+// live: BXH lưu kèm thời gian lưu cuối; mở game lại mà lần lưu cuối đã
+// quá 4 TIẾNG (tức live trước đã tắt lâu, đây là live mới) thì tự reset
+// BXH về trống. Tải lại trang trong lúc live đang chạy thì thời gian lưu
+// cuối luôn mới (lưu mỗi 5 giây) nên BXH không mất. Bản lưu cũ (chưa có
+// savedAt) thì giữ nguyên, lần lưu sau sẽ có savedAt.
+const BXH_STALE_MS = 4 * 60 * 60 * 1000 // 4 tiếng
 export function loadBxh() {
   try {
     const raw = JSON.parse(localStorage.getItem(BXH_KEY) || '{}')
+    if (raw.savedAt && typeof raw.savedAt === 'number' && Date.now() - raw.savedAt > BXH_STALE_MS) {
+      return { giftTotals: {}, likeTotals: {}, provinceTotals: {}, stale: true }
+    }
     return {
       giftTotals: raw.giftTotals && typeof raw.giftTotals === 'object' ? raw.giftTotals : {},
       likeTotals: raw.likeTotals && typeof raw.likeTotals === 'object' ? raw.likeTotals : {},
@@ -37,6 +46,7 @@ function saveBxh(state) {
       giftTotals: state.giftTotals || {},
       likeTotals: state.likeTotals || {},
       provinceTotals: state.provinceTotals || {},
+      savedAt: Date.now(),
     }))
   } catch { /* ignore */ }
 }
@@ -525,6 +535,18 @@ export function useTugOfWar() {
     const iv = setInterval(() => {
       const s = stateRef.current
       if (!s) return
+      // Trận mới reset đội tỉnh về trống → demo vào lại 6 người tỉnh mẫu
+      // ở đầu màn (countdown) để màn sau vẫn đấu tỉnh thành, như khán
+      // giả thật bình luận tỉnh mới.
+      if ((s.phase === 'countdown' || s.phase === 'waiting') && (!s.provinceUsers || !s.provinceUsers['demo-a'])) {
+        joinProvince(s, 'hanoi', 'Lan Thử', 'demo-a')
+        joinProvince(s, 'hcm', 'Hoa Thử', 'demo-a2')
+        joinProvince(s, 'danang', 'Nam Thử', 'demo-a3')
+        joinProvince(s, 'hanoi', 'Minh Thử', 'demo-b')
+        joinProvince(s, 'hcm', 'Linh Thử', 'demo-b2')
+        joinProvince(s, 'danang', 'Tuấn Thử', 'demo-b3')
+        syncProvinceTeams(s)
+      }
       if (s.phase === 'pulling') {
         const teamId = n % 2 === 0 ? 'A' : 'B'
         const power = powers[Math.floor(Math.random() * powers.length)]
