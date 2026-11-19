@@ -37,17 +37,19 @@ const HUMAN_SLOTS = {
 // Vị trí 3 người mỗi đội dọc theo dây (dây chạy theo trục X, hố bùn ở giữa).
 // Cả đội đứng THÀNH HÀNG dọc dây (z ≈ 0, đúng chỗ dây chạy qua) như kéo
 // co thật — mỗi người nắm dây ngay trước mặt mình, không đứng lệch dây.
-// Người mẫu đứng ở 2,0 / 3,3 / 4,6; khán giả vào đội chen vào các khe
-// 2,65 / 3,95 / 5,25 (cách đều 0,65 — vai kề vai như kéo co thật).
+// Người mẫu đứng XA hố bùn (mức chính giữa) để màn kéo lâu, gay cấn:
+// 4,0 / 5,3 / 6,6 thay vì 2,0 / 3,3 / 4,6 cũ (người đầu đứng NGAY TRONG
+// hố bùn bán kính 3,4 nên nhìn như đã thua từ đầu). Khán giả vào đội chen
+// vào các khe 4,65 / 5,95 / 7,05. Dây dài 17m (±8,5) vẫn đủ chỗ.
 const TEAM_SPOTS = {
-  A: [{ x: -2.0, z: 0.12 }, { x: -3.3, z: -0.12 }, { x: -4.6, z: 0.06 }],
-  B: [{ x: 2.0, z: -0.12 }, { x: 3.3, z: 0.12 }, { x: 4.6, z: -0.06 }],
+  A: [{ x: -4.0, z: 0.12 }, { x: -5.3, z: -0.12 }, { x: -6.6, z: 0.06 }],
+  B: [{ x: 4.0, z: -0.12 }, { x: 5.3, z: 0.12 }, { x: 6.6, z: -0.06 }],
 }
 // Chỗ đứng của khán giả vào đội (mới vào gần nhất, tối đa 3 người/đội hiện
 // ra — còn lại chỉ tính lực kéo, xem số người ở bảng tỉ số).
 const VIEWER_SPOTS = {
-  A: [{ x: -2.65, z: -0.15 }, { x: -3.95, z: 0.15 }, { x: -5.05, z: -0.1 }],
-  B: [{ x: 2.65, z: 0.15 }, { x: 3.95, z: -0.15 }, { x: 5.05, z: 0.1 }],
+  A: [{ x: -4.65, z: -0.15 }, { x: -5.95, z: 0.15 }, { x: -7.05, z: -0.1 }],
+  B: [{ x: 4.65, z: 0.15 }, { x: 5.95, z: -0.15 }, { x: 7.05, z: 0.1 }],
 }
 const VIEWER_CAP = 3
 const ROPE_Y = 1.0
@@ -298,7 +300,7 @@ export default function TugScene({ liveRef }) {
     // mờ dần tự nhiên như ngoài đời (không cắt cụt).
     scene.fog = new THREE.Fog(0xbfd4e6, 55, 160)
     const camera = new THREE.PerspectiveCamera(66, width / height, 0.1, 400)
-    camera.position.set(0, 5.8, 16.5)
+    camera.position.set(0, 6.2, 23)
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x4a7c59, 0.7))
     // Nắng CHÍNH từ phía trước-trái-cao (hướng về camera): chiếu thẳng
@@ -1020,7 +1022,7 @@ export default function TugScene({ liveRef }) {
     // key "A-0" -> true khi người đó đã chạm bùn (để văng bùn 1 lần duy nhất)
     const humanFall = new Map()
     const humanBlob = new Map()
-    const camBase = new THREE.Vector3(0, 5.8, 16.5)
+    const camBase = new THREE.Vector3(0, 6.2, 23) // đội hình rộng (±7,05) nên lùi ra để thấy hết 2 đội
     const lookTarget = new THREE.Vector3(0, 1.1, 0)
     // Vị trí camera hiện tại (trượt mượt giữa toàn cảnh và cận cảnh té bùn).
     const curCamPos = camBase.clone()
@@ -1270,7 +1272,11 @@ export default function TugScene({ liveRef }) {
             // Dáng kéo: vào dáng chắc (tối thiểu 0,7) ngay khi màn đang kéo,
             // gồng mạnh hơn khi đội đông người / quà bùng lên.
             const targetW = posing && !isLoser ? Math.max(0.7, Math.min(1, Math.max(0, ((teamState?.pullRate || 0) - 0.3) / 0.7))) : 0
-            const poseRate = targetW > entry.poseWeight ? 4 : 1.5
+            // Ngã xuống bùn thì tay BUÔNG NHANH (tốc độ 8 thay vì 1,5):
+            // người té mà tay vẫn gồng cứng dáng kéo trong lúc người ngửa
+            // ra sau thì tay nhìn như bẻ ngược ra sau. Tay buông lỏng theo
+            // dáng idle thì té mới tự nhiên.
+            const poseRate = isLoser ? 8 : (targetW > entry.poseWeight ? 4 : 1.5)
             entry.poseWeight += (targetW - entry.poseWeight) * damp(poseRate)
             const rockAmp = 0.5 + Math.min(1, (teamState?.pullRate || 0) * 0.15)
             applyPullPose(entry, time, rockAmp, entry.poseWeight)
@@ -1370,7 +1376,11 @@ export default function TugScene({ liveRef }) {
             setClip(entry, want)
             entry.mixer.update(dt)
             const targetW = pulling && !isLoser ? Math.max(0.7, Math.min(1, Math.max(0, ((teamState?.pullRate || 0) - 0.3) / 0.7))) : 0
-            const poseRate = targetW > entry.poseWeight ? 4 : 1.5
+            // Ngã xuống bùn thì tay BUÔNG NHANH (tốc độ 8 thay vì 1,5):
+            // người té mà tay vẫn gồng cứng dáng kéo trong lúc người ngửa
+            // ra sau thì tay nhìn như bẻ ngược ra sau. Tay buông lỏng theo
+            // dáng idle thì té mới tự nhiên.
+            const poseRate = isLoser ? 8 : (targetW > entry.poseWeight ? 4 : 1.5)
             entry.poseWeight += (targetW - entry.poseWeight) * damp(poseRate)
             const rockAmp = 0.5 + Math.min(1, (teamState?.pullRate || 0) * 0.15)
             applyPullPose(entry, time, rockAmp, entry.poseWeight)
@@ -1460,11 +1470,11 @@ export default function TugScene({ liveRef }) {
           tmpLook.set(ls * 0.7, 0.35, 0)
         } else {
           // Chặng 2 (từ 4s trở đi): đội thắng ăn mừng. ws = phía đội thắng
-          // (A ở -X, B ở +X). Camera đứng gần đội thắng, hơi chếch sang
-          // phía ngược lại để thấy mặt họ lúc nhảy ăn mừng.
+          // (A ở -X, B ở +X). Đội thắng đứng ở ±4,0–6,6 (giữa đội ±5,3)
+          // nên camera nhìn về ±5,3 để thấy mặt họ lúc nhảy ăn mừng.
           const ws = winnerTeam === 'A' ? -1 : 1
-          tmpCamPos.set(-ws * 2.2, 2.8, 10.5)
-          tmpLook.set(ws * 2.2, 1.0, 0)
+          tmpCamPos.set(-ws * 3.0, 2.8, 12.0)
+          tmpLook.set(ws * 5.3, 1.0, 0)
         }
       } else {
         tmpCamPos.set(camBase.x + sway, camBase.y, camBase.z + Math.abs(rope) * 1.5)
