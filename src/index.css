@@ -170,29 +170,57 @@ input, select { font-family: inherit; }
   100% { transform: rotate(-3deg) scale(1); }
 }
 
-/* ── Thùng tiếp tế Free Fire: thả dù rơi xuống khi có quà to ── */
+/* ── Thùng tiếp tế Free Fire: thả dù rơi xuống khi có quà to ──
+   Rơi ở góc phải dưới (không che nhân vật/bảng điểm giữa màn), nhỏ gọn;
+   đáp xuống thì nắp bật mở + sáng vàng rồi mờ dần cho gọn, không rối. */
 .pml-airdrop {
-  position: absolute; left: 50%; top: -110px; z-index: 4; pointer-events: none;
-  transform: translateX(-50%);
-  animation: pml-airdrop-fall 1.1s cubic-bezier(.3, .7, .4, 1) forwards;
+  position: absolute; right: 9%; top: -110px; z-index: 4; pointer-events: none;
+  animation: pml-airdrop-fall 1.1s cubic-bezier(.3, .7, .4, 1) forwards, pml-airdrop-out .45s ease-in 2.7s forwards;
 }
 .pml-airdrop-chute {
-  width: 70px; height: 34px; margin: 0 auto;
+  width: 56px; height: 28px; margin: 0 auto;
   background: linear-gradient(90deg, #ff6b6b 0 25%, #fff 25% 50%, #ff6b6b 50% 75%, #fff 75% 100%);
-  border-radius: 70px 70px 0 0;
+  border-radius: 56px 56px 0 0;
 }
 .pml-airdrop-crate {
-  width: 46px; height: 46px; margin: 2px auto 0;
+  position: relative; width: 38px; height: 38px; margin: 2px auto 0;
   background: linear-gradient(180deg, #a67c52, #8d6b3f);
   border: 2px solid #5c4326; border-radius: 6px;
   display: flex; align-items: center; justify-content: center; color: #ffe08a;
   box-shadow: 0 6px 14px rgba(0,0,0,.45);
 }
+/* Nắp thùng bật mở khi đáp xuống (xoay ra + mờ dần). */
+.pml-airdrop-lid {
+  position: absolute; left: -2px; right: -2px; top: -2px; height: 12px;
+  background: linear-gradient(180deg, #c09a6b, #a67c52);
+  border: 2px solid #5c4326; border-bottom: none; border-radius: 6px 6px 0 0;
+  transform-origin: left bottom;
+  animation: pml-airdrop-open .5s ease-out 1.05s forwards;
+}
+@keyframes pml-airdrop-open {
+  to { transform: rotate(-115deg) translateY(-4px); opacity: 0; }
+}
+/* Ánh sáng vàng tỏa ra khi thùng mở (như đồ quý trong thùng). */
+.pml-airdrop-glow {
+  position: absolute; left: 50%; top: 100%; width: 90px; height: 90px;
+  transform: translate(-50%, -50%) scale(.2); opacity: 0;
+  background: radial-gradient(circle, rgba(255, 214, 10, .9) 0%, rgba(255, 214, 10, 0) 70%);
+  border-radius: 50%; pointer-events: none;
+  animation: pml-airdrop-glow .8s ease-out 1.05s forwards;
+}
+@keyframes pml-airdrop-glow {
+  0% { transform: translate(-50%, -50%) scale(.2); opacity: 0; }
+  30% { opacity: .95; }
+  100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+}
 @keyframes pml-airdrop-fall {
   0% { top: -110px; }
-  70% { top: 34%; }
-  85% { top: 38%; }
-  100% { top: 36%; }
+  70% { top: 60%; }
+  85% { top: 63%; }
+  100% { top: 62%; }
+}
+@keyframes pml-airdrop-out {
+  to { opacity: 0; transform: translateY(10px); }
 }
 
 /* ── Huy hiệu hạng Free Fire + tag ĐANG ĐẤU trong BXH tỉnh ── */
@@ -395,14 +423,22 @@ input, select { font-family: inherit; }
 /* BXH thu gọn: chỉ tỉnh dẫn đầu + người tặng nhiều nhất (2 dòng). */
 .pml-bxh-mini { display: flex; flex-direction: column; gap: 2px; }
 .pml-bxh-minirow { display: flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 800; line-height: 1.4; text-shadow: 0 1px 2px rgba(0,0,0,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* Bảng giá quà: quà nào đáng bao nhiêu lực kéo. */
+/* Bảng giá quà góc phải dưới (chỗ này đang trống): 1 hàng 5 ô kiểu quà
+   TikTok — icon thật + lực kéo, ít chữ cho đỡ rối. */
 .pml-gift-legend {
+  position: absolute; right: 10px; bottom: calc(104px + env(safe-area-inset-bottom)); z-index: 6;
+  display: flex; gap: 3px; align-items: stretch;
   background: rgba(8, 38, 26, .68); border: 1px solid rgba(255,255,255,.2); border-radius: 12px;
-  padding: 6px 9px; backdrop-filter: blur(6px); box-shadow: 0 4px 14px rgba(0,0,0,.3);
+  padding: 6px 7px; backdrop-filter: blur(6px); box-shadow: 0 4px 14px rgba(0,0,0,.3);
+  pointer-events: none;
 }
-.pml-gift-legend-title { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 900; margin-bottom: 2px; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
-.pml-gift-legend-row { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; line-height: 1.5; text-shadow: 0 1px 2px rgba(0,0,0,.5); white-space: nowrap; }
-.pml-gl-ic { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #ffe9a8 70%); color: #b45309; border: 1.5px solid #fff; flex: none; }
+.pml-gl-item {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  width: 30px; padding: 2px 0 1px; border-radius: 8px;
+  background: rgba(255,255,255,.08);
+}
+.pml-gl-item img { filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); }
+.pml-gl-item b { font-size: 10px; font-weight: 900; color: #ffe08a; line-height: 1; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
 .pml-bxh-sec { margin-top: 5px; }
 .pml-bxh-head { font-size: 10.5px; font-weight: 800; opacity: .85; margin-bottom: 2px; }
 .pml-bxh-row { display: flex; gap: 5px; align-items: center; font-size: 12px; line-height: 1.45; }

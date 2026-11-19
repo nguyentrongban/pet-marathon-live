@@ -185,7 +185,7 @@ function DisplayGame() {
         {giftFx && !giftFx.big && (
           <div className="pml-gift" key={giftFx.id}>
             <div className="pml-gift-box">
-              <span className="pml-gift-sticker"><GiftIcon gift={giftFx.gift} size={64} /></span>
+              <span className="pml-gift-sticker"><GiftIcon gift={giftFx.gift} power={giftFx.power} size={64} /></span>
               <span className="pml-gift-spark"><Sparkles size={22} /></span>
             </div>
             <div className="pml-gift-name">{giftFx.sender}</div>
@@ -195,10 +195,16 @@ function DisplayGame() {
         )}
         {giftFx && giftFx.big && (
           <div className="pml-fireworks" key={giftFx.id}>
-            {/* Thùng tiếp tế Free Fire: quà to thì thùng tiếp tế thả dù rơi xuống. */}
+            {/* Thùng tiếp tế Free Fire: quà to thì thùng tiếp tế thả dù rơi xuống
+                góc phải dưới (không che nhân vật/bảng điểm giữa màn), đáp
+                xuống thì nắp bật mở + sáng vàng rồi mờ dần cho gọn. */}
             <div className="pml-airdrop">
               <div className="pml-airdrop-chute" />
-              <div className="pml-airdrop-crate"><Package size={24} /></div>
+              <div className="pml-airdrop-crate">
+                <div className="pml-airdrop-lid" />
+                <Package size={20} />
+              </div>
+              <div className="pml-airdrop-glow" />
             </div>
             <span className="fw-burst fw-1" />
             <span className="fw-burst fw-2" />
@@ -206,7 +212,7 @@ function DisplayGame() {
             <span className="fw-burst fw-4" />
             <span className="fw-burst fw-5" />
             <div className="pml-fireworks-name">
-              <div className="fw-crown"><Sparkles size={26} /> <GiftIcon gift={giftFx.gift} size={56} className="fw-gift-ic" /></div>
+              <div className="fw-crown"><Sparkles size={26} /> <GiftIcon gift={giftFx.gift} power={giftFx.power} size={56} className="fw-gift-ic" /></div>
               <div className="fw-name">{giftFx.sender}</div>
               <div className="fw-sub">tặng {giftFx.gift || 'quà to'} · <Zap size={14} /> {Math.round(giftFx.power)} lực kéo!</div>
               {giftProvince && <div className="fw-province"><MapPin size={15} /> {giftProvince.name}{giftFx.provinceBonus ? ' · Tỉnh dẫn đầu ×1,5!' : ''}</div>}
@@ -293,23 +299,18 @@ function DisplayGame() {
               )}
             </div>
           )}
-          {/* Bảng giá quà: tên + icon quà THẬT của TikTok (ảnh gốc, giá xu
-              đã xác nhận: Hoa hồng 1, Quả đào 5, Cỏ bốn lá 10, Nước hoa 20,
-              Hạc giấy 99) để khán giả biết tặng món nào thì mạnh bao nhiêu. */}
-          <div className="pml-gift-legend">
-            <div className="pml-gift-legend-title"><Gift size={12} /> Quà = lực kéo</div>
-            <div className="pml-gift-legend-row">
-              <span className="pml-gl-ic"><GiftIcon gift="hoa hồng" size={14} /></span> Hoa hồng +1
-              <span className="pml-gl-ic"><GiftIcon gift="quả đào" size={14} /></span> Quả đào +5
-            </div>
-            <div className="pml-gift-legend-row">
-              <span className="pml-gl-ic"><GiftIcon gift="cỏ bốn lá" size={14} /></span> Cỏ bốn lá +10
-              <span className="pml-gl-ic"><GiftIcon gift="nước hoa" size={14} /></span> Nước hoa +25
-            </div>
-            <div className="pml-gift-legend-row">
-              <span className="pml-gl-ic"><GiftIcon gift="hạc giấy" size={14} /></span> Hạc giấy +100
-            </div>
-          </div>
+        </div>
+
+        {/* ── Bảng giá quà góc phải dưới (chỗ này đang trống): kiểu ô quà
+             của TikTok — chỉ icon thật + lực kéo, ít chữ cho đỡ rối. Tên
+             + giá xu đã xác nhận: Hoa hồng 1, Quả đào 5, Cỏ bốn lá 10,
+             Nước hoa 20, Hạc giấy 99. */}
+        <div className="pml-gift-legend">
+          <span className="pml-gl-item"><GiftIcon gift="hoa hồng" size={22} /><b>+1</b></span>
+          <span className="pml-gl-item"><GiftIcon gift="quả đào" size={22} /><b>+5</b></span>
+          <span className="pml-gl-item"><GiftIcon gift="cỏ bốn lá" size={22} /><b>+10</b></span>
+          <span className="pml-gl-item"><GiftIcon gift="nước hoa" size={22} /><b>+25</b></span>
+          <span className="pml-gl-item"><GiftIcon gift="hạc giấy" size={22} /><b>+100</b></span>
         </div>
 
         {/* ── Tạm dừng: dải nhỏ ở dưới, không che sân ── */}
