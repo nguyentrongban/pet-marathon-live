@@ -2,7 +2,7 @@
 // Test logic thuần (không cần framework): chạy bằng `node tests/tug.test.js`
 // hoặc `npm test`. Mỗi test là 1 hàm assert, in PASS/FAIL rồi tổng kết.
 // LUẬT v2: thành viên = +1 lực kéo liên tục · quà = bùng lực (99 xu = 100,
-// bằng 100 người, tắt dần) · tim = +thời gian (1 người đủ 100 tim → +10s).
+// bằng 100 người, tắt dần) · tim = +thời gian (cả phòng đủ 100 tim → +10s).
 import assert from 'node:assert'
 import { createSeqTracker, normalizeEvent, parseCommand } from '../src/game/adapter.js'
 import { detectProvince, provinceInfo, provinceRank } from '../src/game/provinces.js'
@@ -54,7 +54,7 @@ test('mỗi người vào đội là +1 lực kéo liên tục', () => {
 
 test('đội đông người kéo thắng đội ít người (không cần quà)', () => {
   const s = crowdMatch(10, 1)
-  step(s, 8)
+  step(s, 10)
   assert.equal(s.phase, 'roundEnd', 'đội 10 người phải thắng màn')
   assert.equal(s.roundWinner, 'A')
   assert.equal(s.teams.A.roundWins, 1)
@@ -196,8 +196,8 @@ test('hết giờ: đội dẫn trước thắng, dây ở giữa thì hòa', ()
   assert.equal(s2.roundWinner, null, 'dây gần giữa thì hòa')
 })
 
-// ── 7. Thả tim = +thời gian (tính theo từng người) ─────────────────────────
-test('1 người đủ 100 tim thì màn kéo dài thêm 10 giây, tim không kéo dây', () => {
+// ── 7. Thả tim = +thời gian (cộng dồn CẢ PHÒNG) ───────────────────────────
+test('cả phòng đủ 100 tim thì màn kéo dài thêm 10 giây, tim không kéo dây', () => {
   const s = freshMatch()
   s.rope = 0.4
   const n = applyLikes(s, 'user1', 100)
@@ -216,13 +216,13 @@ test('1 người đủ 100 tim thì màn kéo dài thêm 10 giây, tim không k�
   assert.ok(approx(s.roundTimeLeft, 85))
 })
 
-test('tim tính theo từng người, không cộng dồn cả phòng', () => {
+test('tim cộng dồn cả phòng: 60 + 60 của 2 người cũng đủ 100', () => {
   const s = freshMatch()
-  assert.equal(applyLikes(s, 'user1', 60), 0, 'user1 mới 60 tim → chưa đủ')
-  assert.equal(applyLikes(s, 'user2', 60), 0, 'user2 mới 60 tim → chưa đủ')
-  assert.ok(approx(s.roundTimeLeft, 45), '2 người 60+60 không được cộng giờ')
+  assert.equal(applyLikes(s, 'user1', 60), 0, 'mới 60 tim → chưa đủ')
+  assert.equal(applyLikes(s, 'user2', 60), 1, '60+60=120 → đủ 100, +10s, còn dư 20')
+  assert.ok(approx(s.roundTimeLeft, 55), 'cộng dồn cả phòng phải +10s')
   assert.equal(s.likes, 120, 'tổng tim vẫn đếm')
-  assert.equal(applyLikes(s, 'user1', 40), 1, 'user1 đủ 60+40=100 → +10s')
+  assert.equal(applyLikes(s, 'user3', 80), 1, '20 dư + 80 = đủ 100 → +10s nữa')
 })
 
 test('tim cộng tối đa +60 giây / màn', () => {

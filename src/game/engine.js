@@ -164,7 +164,7 @@ export const DEFAULT_SETTINGS = {
   roundSeconds: 45,          // 1 màn kéo tối đa 45 giây (chưa tính tim cộng thêm)
   countdownSeconds: 3,
   winsToMatch: 2,            // thắng 2 màn trước thì thắng trận (best of 3 — tối đa 3 màn)
-  winLine: 0.5,              // vạch giữa chạm ±0,5 (cờ chạy qua 3/4 thước) là thắng màn ngay — đội kéo rõ ràng thì không phải chờ hết giờ
+  winLine: 0.7,              // vạch giữa chạm ±0,7 (cờ chạy qua ~84% thước) là thắng màn ngay — xa hơn 0,5 để màn kéo lâu hơn, gay cấn hơn (0,9 thì xa quá, hay phải chờ hết giờ)
   ropeSpeed: 0.15,           // tốc độ vạch giữa tối đa — 1 phe áp đảo hoàn toàn thì vạch chạy 0,15/giây
   ropeDecay: 0.02,           // dây tự trôi nhẹ về giữa 2%/giây
   boostDecay: 0.2,           // quà tặng tắt dần — bùng lực giảm một nửa sau ~3,5 giây
@@ -220,7 +220,7 @@ export function createMatch(settings = DEFAULT_SETTINGS) {
     luckyStar: null, // { team } — đội thắng màn trước được bắt đầu màn sau lệch 0,12 về phía mình
     streak: { A: 0, B: 0 }, // chuỗi thắng trận liên tiếp của mỗi đội (giữ qua trận)
     feed: [], floaters: [], effects: [],
-    likes: 0, likeByUser: {}, timeAddedByLikes: 0, finalTime: false,
+    likes: 0, likesInRound: 0, timeAddedByLikes: 0, finalTime: false,
     // BXH (lưu lại qua các màn/trận — chỉ xóa khi streamer bấm Xóa BXH):
     // giftTotals: userId → { nickname, power, coins, count, avatar }
     // likeTotals: userId → { nickname, likes, avatar }
@@ -563,9 +563,10 @@ export function applyPull(state, teamId, power, sender = {}, giftName = '', opts
   return { ok: true, teamId, effect, comeback: losing, final, flip, province: pv, provinceBonus }
 }
 
-// Thả tim: KHÔNG kéo dây nữa — chỉ +thời gian kéo. 1 người thả đủ 100 tim
-// thì màn kéo dài thêm 10 giây (tối đa +60 giây/màn). Tính theo từng
-// người (không cộng dồn cả phòng) để 1 người thả 100 tim mới tính.
+// Thả tim: KHÔNG kéo dây nữa — chỉ +thời gian kéo. Cả phòng thả đủ 100
+// tim (cộng dồn mọi người, không tính theo từng người) thì màn kéo dài
+// thêm 10 giây (tối đa +60 giây/màn). Cả phòng cùng tap tim để cộng giờ
+// cho đội mình thích — vui hơn là bắt 1 người tap đủ 100 cái.
 // BXH tim tính TỔNG CẢ PHIÊN (ghi cả khi chưa vào màn kéo) để bảng nhỏ
 // ở góc trái luôn có người đứng đầu.
 export function applyLikes(state, userId, count, nickname = '', avatar = '') {
@@ -575,11 +576,10 @@ export function applyLikes(state, userId, count, nickname = '', avatar = '') {
   const every = state.settings.likeTimeEvery || 100
   const per = state.settings.likeTimeSeconds || 10
   const maxBonus = state.settings.likeTimeMaxBonus ?? 60
-  const uid = userId || 'anon'
-  state.likeByUser[uid] = (state.likeByUser[uid] || 0) + (count || 0)
+  state.likesInRound = (state.likesInRound || 0) + (count || 0)
   let added = 0
-  while (state.likeByUser[uid] >= every && state.timeAddedByLikes < maxBonus) {
-    state.likeByUser[uid] -= every
+  while (state.likesInRound >= every && state.timeAddedByLikes < maxBonus) {
+    state.likesInRound -= every
     state.roundTimeLeft += per
     state.timeAddedByLikes += per
     added++
@@ -622,7 +622,7 @@ export function startRound(state) {
     state.teams[t].boost = 0
     state.teams[t].pullRate = state.teams[t].members.length
   }
-  state.likeByUser = {}
+  state.likesInRound = 0
   state.timeAddedByLikes = 0
   state.finalTime = false
   pushFeed(state, 'info', `🏁 Màn ${state.round} — chuẩn bị… 3 — 2 — 1!`)

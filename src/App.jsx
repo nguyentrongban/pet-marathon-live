@@ -293,15 +293,21 @@ function DisplayGame() {
               )}
             </div>
           )}
-          {/* Bảng giá quà: quà nào đáng bao nhiêu lực kéo, để khán giả biết tặng gì. */}
+          {/* Bảng giá quà: tên + icon quà THẬT của TikTok (ảnh gốc, giá xu
+              đã xác nhận: Hoa hồng 1, Quả đào 5, Cỏ bốn lá 10, Nước hoa 20,
+              Hạc giấy 99) để khán giả biết tặng món nào thì mạnh bao nhiêu. */}
           <div className="pml-gift-legend">
             <div className="pml-gift-legend-title"><Gift size={12} /> Quà = lực kéo</div>
             <div className="pml-gift-legend-row">
               <span className="pml-gl-ic"><GiftIcon gift="hoa hồng" size={14} /></span> Hoa hồng +1
-              <span className="pml-gl-ic"><GiftIcon gift="bing chilling" size={14} /></span> Kem +5
+              <span className="pml-gl-ic"><GiftIcon gift="quả đào" size={14} /></span> Quả đào +5
             </div>
             <div className="pml-gift-legend-row">
-              10 xu +10 · 20 xu +25 · <span className="pml-gl-ic"><GiftIcon gift="hạc giấy" size={14} /></span> Hạc giấy +100
+              <span className="pml-gl-ic"><GiftIcon gift="cỏ bốn lá" size={14} /></span> Cỏ bốn lá +10
+              <span className="pml-gl-ic"><GiftIcon gift="nước hoa" size={14} /></span> Nước hoa +25
+            </div>
+            <div className="pml-gift-legend-row">
+              <span className="pml-gl-ic"><GiftIcon gift="hạc giấy" size={14} /></span> Hạc giấy +100
             </div>
           </div>
         </div>

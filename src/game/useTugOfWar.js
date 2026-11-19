@@ -52,8 +52,10 @@ export function loadSettings() {
     if (saved.winsToMatch === 3) saved.winsToMatch = 2
     // Đổi luật 2026-11-19: vạch thắng 0,9 → 0,5 (đội kéo rõ ràng thì thắng
     // ngay, không phải chờ hết giờ) + dây chạy nhanh hơn 0,12 → 0,15.
-    // Máy nào còn lưu giá trị mặc định cũ thì đổi sang mới.
-    if (saved.winLine === 0.9) saved.winLine = 0.5
+    // Đổi tiếp 2026-11-19 tối: vạch thắng 0,5 → 0,7 (xa hơn để màn kéo
+    // lâu hơn, gay cấn hơn; 0,9 thì xa quá, hay phải chờ hết giờ).
+    // Máy nào còn lưu giá trị mặc định cũ (0,9 hoặc 0,5) thì đổi sang 0,7.
+    if (saved.winLine === 0.9 || saved.winLine === 0.5) saved.winLine = 0.7
     if (saved.ropeSpeed === 0.12) saved.ropeSpeed = 0.15
     return {
       ...DEFAULT_SETTINGS,
