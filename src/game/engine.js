@@ -12,10 +12,10 @@
 // · Đội thua quá nửa đường được ×2 (cơ hội cuối); 10 giây cuối quà ×2
 //   (giờ chót). Thắng 2 màn trước thì vô địch trận (best of 3 — tối đa 3
 //   màn, 2–1 là vô địch), chuỗi thắng giữ qua trận.
-// · Cờ quốc gia: quà tính theo nước của người tặng — nước dẫn đầu được
-//   thưởng thêm lực kéo (×1,5) để khán giả tặng quà đưa nước mình lên số 1.
+// · Tỉnh thành: quà tính theo tỉnh của người tặng — tỉnh dẫn đầu được
+//   thưởng thêm lực kéo (×1,5) để khán giả tặng quà đưa tỉnh mình lên số 1.
 
-import { countryInfo } from './countries.js'
+import { provinceInfo } from './provinces.js'
 
 // ─── Người chơi + đội ───────────────────────────────────────────────────────
 // 6 người thật (model 3D): Đội Đỏ = Anh Hùng (lính), Kaito (võ sĩ), Mia;
@@ -176,7 +176,7 @@ export const DEFAULT_SETTINGS = {
   likeTimeMaxBonus: 60,      // ... tối đa +60 giây / màn
   finalSeconds: 10,          // 10 giây cuối là "giờ chót"
   finalGiftMult: 2,          // ... quà tặng trong giờ chót nhân đôi lực kéo
-  countryLeaderMult: 1.5,    // nước dẫn đầu BXH quốc gia: quà của nước đó ×1,5 lực kéo
+  provinceLeaderMult: 1.5,    // tỉnh dẫn đầu BXH tỉnh thành: quà của tỉnh đó ×1,5 lực kéo
   giftMap: { ...DEFAULT_GIFT_MAP },
   streamerId: '',
   soundOn: true,
@@ -224,10 +224,10 @@ export function createMatch(settings = DEFAULT_SETTINGS) {
     // BXH (lưu lại qua các màn/trận — chỉ xóa khi streamer bấm Xóa BXH):
     // giftTotals: userId → { nickname, power, coins, count, avatar }
     // likeTotals: userId → { nickname, likes, avatar }
-    // countryTotals: mã nước → { code, power, count, lastGiver }
-    giftTotals: {}, likeTotals: {}, countryTotals: {},
-    // Nước mỗi người đã chọn (bình luận cờ/mã nước): userId → mã nước.
-    userCountry: {},
+    // provinceTotals: mã tỉnh → { code, power, count, lastGiver }
+    giftTotals: {}, likeTotals: {}, provinceTotals: {},
+    // Tỉnh mỗi người đã chọn (bình luận tên tỉnh): userId → mã tỉnh.
+    userProvince: {},
     nextRoundIn: 0, matchEndIn: 0,
     settings: { ...settings },
     stats: { gifts: 0, pulls: 0 },
@@ -276,33 +276,33 @@ export function topLikers(state, n = 3) {
 export function clearBxh(state) {
   state.giftTotals = {}
   state.likeTotals = {}
-  state.countryTotals = {}
-  state.userCountry = {}
+  state.provinceTotals = {}
+  state.userProvince = {}
 }
 
-// ─── BXH Quốc gia: quà tặng tính theo nước của người tặng ────────────────
-// Nước dẫn đầu được thưởng thêm lực kéo (×1,5) để khán giả tặng quà đưa
-// nước mình lên số 1 rồi giữ vị trí đó. Tính theo TỔNG CẢ PHIÊN như BXH
+// ─── BXH Tỉnh thành: quà tặng tính theo tỉnh của người tặng ──────────────
+// Tỉnh dẫn đầu được thưởng thêm lực kéo (×1,5) để khán giả tặng quà đưa
+// tỉnh mình lên số 1 rồi giữ vị trí đó. Tính theo TỔNG CẢ PHIÊN như BXH
 // người tặng, lưu lại bằng localStorage ở màn hiển thị (xem useTugOfWar).
-export function recordCountryGift(state, code, power, nickname = '') {
+export function recordProvinceGift(state, code, power, nickname = '') {
   if (!code) return null
-  const cur = state.countryTotals[code] || { code, power: 0, count: 0, lastGiver: '' }
+  const cur = state.provinceTotals[code] || { code, power: 0, count: 0, lastGiver: '' }
   cur.power += power || 0
   cur.count += 1
   if (nickname) cur.lastGiver = nickname
-  state.countryTotals[code] = cur
+  state.provinceTotals[code] = cur
   return cur
 }
-// Top N nước tặng quà nhiều nhất (theo tổng lực kéo từ quà của nước đó).
-export function topCountries(state, n = 3) {
-  return Object.values(state.countryTotals || {})
+// Top N tỉnh tặng quà nhiều nhất (theo tổng lực kéo từ quà của tỉnh đó).
+export function topProvinces(state, n = 3) {
+  return Object.values(state.provinceTotals || {})
     .sort((a, b) => b.power - a.power)
     .slice(0, n)
-    .map((c) => ({ ...c, ...(countryInfo(c.code) || { flag: '🌍', name: c.code }) }))
+    .map((c) => ({ ...c, ...(provinceInfo(c.code) || { name: c.code, short: c.code }) }))
 }
-// Nước đang dẫn đầu BXH quốc gia (null nếu chưa ai tặng quà có nước).
-export function countryLeader(state) {
-  return topCountries(state, 1)[0] || null
+// Tỉnh đang dẫn đầu BXH tỉnh thành (null nếu chưa ai tặng quà có tỉnh).
+export function provinceLeader(state) {
+  return topProvinces(state, 1)[0] || null
 }
 
 // ─── Toast: có ai vào xem / theo dõi / chia sẻ thì hiện 2 giây rồi mất ────
@@ -414,17 +414,17 @@ export function applyPull(state, teamId, power, sender = {}, giftName = '', opts
     || (teamId === 'B' && state.rope > state.settings.comebackAt)
   // Giờ chót: 10 giây cuối quà nhân đôi — kéo quà tặng về phút chót.
   const final = state.roundTimeLeft <= (state.settings.finalSeconds ?? 10)
-  // Nước của người tặng: kèm theo quà, hoặc đã chọn trước đó bằng bình luận
-  // cờ/mã nước. Nước đang dẫn đầu BXH quốc gia được thưởng thêm lực kéo.
+  // Tỉnh của người tặng: kèm theo quà, hoặc đã chọn trước đó bằng bình luận
+  // tên tỉnh. Tỉnh đang dẫn đầu BXH tỉnh thành được thưởng thêm lực kéo.
   const senderName = sender.nickname || 'Khán giả'
-  const cc = sender.country || state.userCountry[sender.userId] || null
-  if (cc && sender.userId) state.userCountry[sender.userId] = cc
-  const leader = countryLeader(state)
-  const countryBonus = !!(cc && leader && cc === leader.code)
+  const pv = sender.province || state.userProvince[sender.userId] || null
+  if (pv && sender.userId) state.userProvince[sender.userId] = pv
+  const leader = provinceLeader(state)
+  const provinceBonus = !!(pv && leader && pv === leader.code)
   let effect = giftBoost(power)
   if (losing) effect *= state.settings.comebackMult
   if (final) effect *= state.settings.finalGiftMult ?? 2
-  if (countryBonus) effect *= state.settings.countryLeaderMult ?? 1.5
+  if (provinceBonus) effect *= state.settings.provinceLeaderMult ?? 1.5
   team.boost += effect
   team.pullRate = team.members.length + team.boost
   team.totalPull += effect
@@ -439,18 +439,18 @@ export function applyPull(state, teamId, power, sender = {}, giftName = '', opts
   if (opts.gift !== false) {
     const coins = giftPrice(giftName) ?? 0
     recordGift(state, sender.userId, senderName, effect, coins, sender.avatar || '')
-    // BXH quốc gia: quà tính cho nước của người tặng (lực cuối cùng, đã
-    // nhân các hệ số) để nước dẫn đầu càng được củng cố.
-    if (cc) recordCountryGift(state, cc, effect, senderName)
+    // BXH tỉnh thành: quà tính cho tỉnh của người tặng (lực cuối cùng, đã
+    // nhân các hệ số) để tỉnh dẫn đầu càng được củng cố.
+    if (pv) recordProvinceGift(state, pv, effect, senderName)
   }
   // LẬT KÈO: 1 món quà mạnh hơn cả số người đội kia — khoảnh khắc "cá voi
   // cân cả đám đông", hiện to trên màn hình.
   const otherBase = state.teams[otherTeam(teamId)].members.length
   const flip = effect > otherBase && otherBase > 0
   const big = effect >= 25
-  const flag = cc ? `${countryInfo(cc)?.flag || ''} ` : ''
+  const pvTag = pv ? `📍${provinceInfo(pv)?.name || ''} ` : ''
   pushFeed(state, 'pull',
-    `${TEAMS[teamId].emoji} ${flag}${senderName} kéo ${big ? 'CỰC MẠNH' : 'một phát'} cho ${TEAMS[teamId].name}!${losing ? ' (cơ hội cuối ×2)' : ''}${final ? ' (giờ chót ×2)' : ''}${countryBonus ? ' (nước dẫn đầu ×1,5)' : ''}${flip ? ' 🌊 LẬT KÈO!' : ''}`)
+    `${TEAMS[teamId].emoji} ${pvTag}${senderName} kéo ${big ? 'CỰC MẠNH' : 'một phát'} cho ${TEAMS[teamId].name}!${losing ? ' (cơ hội cuối ×2)' : ''}${final ? ' (giờ chót ×2)' : ''}${provinceBonus ? ' (tỉnh dẫn đầu ×1,5)' : ''}${flip ? ' 🌊 LẬT KÈO!' : ''}`)
   pushFloater(state, teamId, big ? '💪 KÉO CỰC MẠNH!' : '💪 +KÉO!')
   state.effects.push({ id: nextId('fx'), kind: 'pull', team: teamId, t: 0, dur: 0.6 })
   if (flip) state.effects.push({ id: nextId('fx'), kind: 'flip', team: teamId, sender: senderName, t: 0, dur: 2.5 })
@@ -462,10 +462,10 @@ export function applyPull(state, teamId, power, sender = {}, giftName = '', opts
       id: nextId('fx'), kind: 'gift', team: teamId,
       sender: senderName, gift: giftName || '', icon: giftIcon(giftName),
       power: effect, big, t: 0, dur: big ? 3.5 : 2,
-      country: cc || null, countryBonus,
+      province: pv || null, provinceBonus,
     })
   }
-  return { ok: true, teamId, effect, comeback: losing, final, flip, country: cc, countryBonus }
+  return { ok: true, teamId, effect, comeback: losing, final, flip, province: pv, provinceBonus }
 }
 
 // Thả tim: KHÔNG kéo dây nữa — chỉ +thời gian kéo. 1 người thả đủ 100 tim
@@ -675,7 +675,7 @@ export class GiftEngine {
     const power = this.resolveGift(ev.giftName)
     if (power == null) { this.droppedUnmapped++; return { ok: false, reason: 'unmapped', giftName: ev.giftName } }
     const teamId = giftTeam(this.state, ev.userId, ev.text || '')
-    this.queue.push({ power, sender: { nickname: ev.nickname, userId: ev.userId, avatar: ev.avatar || '', country: ev.country || '' }, teamId, giftName: ev.giftName, at: this.state.now })
+    this.queue.push({ power, sender: { nickname: ev.nickname, userId: ev.userId, avatar: ev.avatar || '', province: ev.province || '' }, teamId, giftName: ev.giftName, at: this.state.now })
     if (this.queue.length > 50) this.queue.shift() // hàng đợi đầy: bỏ lượt cũ nhất
     return { ok: true, queued: true, power, teamId }
   }

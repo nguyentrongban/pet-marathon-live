@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import {
   BookOpen, Cable, Flag, Flame, Gift, Hand, Handshake, Heart,
-  Hourglass, MessageCircle, Pause, Shield, Sparkles, Star, Timer, Trophy,
+  Hourglass, MapPin, MessageCircle, Pause, Shield, Sparkles, Star, Timer, Trophy,
   User, Users, Volume2, VolumeX, Waves, X, Zap,
 } from 'lucide-react'
 import TugScene from './components/TugScene'
@@ -14,7 +14,7 @@ import AdminPage from './AdminPage'
 import { useTugOfWar } from './game/useTugOfWar'
 import { WS_STATUS } from './game/wsClient'
 import { TEAMS } from './game/engine'
-import { countryInfo } from './game/countries'
+import { provinceInfo } from './game/provinces'
 
 const APP_VERSION = '2.0.0-tug'
 
@@ -77,10 +77,10 @@ function DisplayGame() {
   // pháo hoa). Chỉ hiện 1 cái mỗi loại để không che màn hình.
   const toastFx = (s?.effects || []).filter((e) => e.kind === 'toast').pop()
   const giftFx = (s?.effects || []).filter((e) => e.kind === 'gift').pop()
-  const giftCountry = giftFx?.country ? countryInfo(giftFx.country) : null
+  const giftProvince = giftFx?.province ? provinceInfo(giftFx.province) : null
   const bxh = s?.bxh || { gifters: [], likers: [] }
-  const countries = bxh.countries || []
-  const hasBxh = (bxh.gifters?.length || 0) > 0 || (bxh.likers?.length || 0) > 0 || countries.length > 0
+  const provinces = bxh.provinces || []
+  const hasBxh = (bxh.gifters?.length || 0) > 0 || (bxh.likers?.length || 0) > 0 || provinces.length > 0
 
   return (
     <div className="pml-app" data-version={APP_VERSION}>
@@ -175,7 +175,7 @@ function DisplayGame() {
             </div>
             <div className="pml-gift-name">{giftFx.sender}</div>
             <div className="pml-gift-sub">tặng {giftFx.gift || 'quà'} · <Zap size={13} /> {Math.round(giftFx.power)} lực kéo</div>
-            {giftCountry && <div className="pml-gift-flag">{giftCountry.flag} {giftCountry.name}{giftFx.countryBonus ? ' · Nước dẫn đầu ×1,5!' : ''}</div>}
+            {giftProvince && <div className="pml-gift-province"><MapPin size={15} /> {giftProvince.name}{giftFx.provinceBonus ? ' · Tỉnh dẫn đầu ×1,5!' : ''}</div>}
           </div>
         )}
         {giftFx && giftFx.big && (
@@ -189,7 +189,7 @@ function DisplayGame() {
               <div className="fw-crown"><Sparkles size={26} /> <GiftIcon gift={giftFx.gift} size={56} className="fw-gift-ic" /></div>
               <div className="fw-name">{giftFx.sender}</div>
               <div className="fw-sub">tặng {giftFx.gift || 'quà to'} · <Zap size={14} /> {Math.round(giftFx.power)} lực kéo!</div>
-              {giftCountry && <div className="fw-flag">{giftCountry.flag} {giftCountry.name}{giftFx.countryBonus ? ' · Nước dẫn đầu ×1,5!' : ''}</div>}
+              {giftProvince && <div className="fw-province"><MapPin size={15} /> {giftProvince.name}{giftFx.provinceBonus ? ' · Tỉnh dẫn đầu ×1,5!' : ''}</div>}
             </div>
           </div>
         )}
@@ -223,18 +223,17 @@ function DisplayGame() {
                 ))}
               </div>
             )}
-            {countries.length > 0 && (
+            {provinces.length > 0 && (
               <div className="pml-bxh-sec">
-                <div className="pml-bxh-head"><Flag size={13} /> Quốc gia dẫn đầu</div>
-                {countries.map((c, i) => (
+                <div className="pml-bxh-head"><MapPin size={13} /> Tỉnh thành dẫn đầu</div>
+                {provinces.map((c, i) => (
                   <div className="pml-bxh-row" key={`c${i}`}>
                     <span className={`pml-bxh-rank r${i + 1}`}>{i + 1}</span>
-                    <span className="pml-bxh-flag">{c.flag}</span>
-                    <span className="pml-bxh-name">{c.name}</span>
+                    <span className="pml-bxh-name">{c.short || c.name}</span>
                     <span className="pml-bxh-val"><Zap size={12} /> {Math.round(c.power)}</span>
                   </div>
                 ))}
-                <div className="pml-bxh-leader">{countries[0].flag} {countries[0].name} dẫn đầu — quà của {countries[0].name} mạnh hơn ×1,5!</div>
+                <div className="pml-bxh-leader">📍 {provinces[0].name} dẫn đầu — quà của {provinces[0].name} mạnh hơn ×1,5!</div>
               </div>
             )}
           </div>
@@ -251,7 +250,7 @@ function DisplayGame() {
             <div className="pml-wait-tap" onClick={game.start} />
             <div className="pml-wait-card" onClick={game.start}>
               <div className="pml-wait-line"><MessageCircle size={14} /> <b>A</b> = Đội Đỏ <TeamDot team="A" /> · <b>B</b> = Đội Xanh <TeamDot team="B" /> · <Gift size={14} /> Quà để kéo · <Heart size={14} fill="currentColor" /> 100 tim = +10s kéo</div>
-              <div className="pml-wait-line"><Flag size={14} /> Bình luận 🇻🇳 hoặc VN để chọn nước của bạn — nước dẫn đầu, quà tặng ×1,5 lực kéo!</div>
+              <div className="pml-wait-line"><MapPin size={14} /> Bình luận tên tỉnh của bạn (Hà Nội, Sài Gòn, Đà Nẵng...) — tỉnh dẫn đầu, quà tặng ×1,5 lực kéo!</div>
               <div className="pml-wait-go"><Hand size={16} /> Chạm màn hình để bắt đầu kéo co!</div>
               {s?.pendingJoins > 0 && <div className="pml-wait-sub"><Hourglass size={13} /> {s.pendingJoins} bạn đang chờ vào đội</div>}
             </div>
@@ -284,7 +283,7 @@ function DisplayGame() {
             <h3><BookOpen size={17} /> CÁCH CHƠI</h3>
             <p><MessageCircle size={14} /> Bình luận <b>A</b> — vào Đội Đỏ <TeamDot team="A" /> · <b>B</b> — vào Đội Xanh <TeamDot team="B" /> (hoặc bình luận tên người: Anh Hùng/Miyo/Mia = Đỏ, Lan/Hương/Bình = Xanh). Mỗi người vào đội là <b>+1 lực kéo liên tục</b> — đội đông người kéo mạnh hơn!</p>
             <p><Gift size={14} /> Tặng quà — quà là cú bùng sức mạnh: hoa hồng 1 xu = 1 lực · hạc giấy 99 xu = <b>100 lực, bằng 100 người!</b> Quà to có thể kéo ngang cả đội đông.</p>
-            <p><Flag size={14} /> Cờ quốc gia — bình luận cờ (🇻🇳) hoặc mã nước (VN) để chọn nước của bạn. Quà tặng được tính cho nước đó, nước dẫn đầu được thưởng <b>×1,5 lực kéo</b> — tặng quà để đưa nước mình lên số 1!</p>
+            <p><MapPin size={14} /> Tỉnh thành — bình luận tên tỉnh/thành của bạn (Hà Nội, Sài Gòn, Đà Nẵng...) để chọn tỉnh của mình. Quà tặng được tính cho tỉnh đó, tỉnh dẫn đầu được thưởng <b>×1,5 lực kéo</b> — tặng quà để đưa tỉnh mình lên số 1!</p>
             <p><Heart size={14} fill="currentColor" /> Thả tim — <b>1 người thả đủ 100 tim thì màn kéo dài thêm 10 giây</b> (tối đa +60 giây). Tim không kéo dây, chỉ thêm giờ!</p>
             <p><Zap size={14} /> Đội đang thua quá nửa đường được nhân đôi lực kéo (cơ hội cuối). <b>10 giây cuối: quà tặng ×2!</b></p>
             <p><Trophy size={14} /> Thắng 2 màn trước thì vô địch trận (best of 3 — tối đa 3 màn, 2–1 là vô địch). Đội thắng màn được ngôi sao may mắn ở màn sau!</p>

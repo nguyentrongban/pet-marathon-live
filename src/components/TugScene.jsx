@@ -17,7 +17,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 import { Sky } from 'three/addons/objects/Sky.js'
 import { clone as cloneModel } from 'three/addons/utils/SkeletonUtils.js'
 import { TEAMS, visibleMembers } from '../game/engine'
-import { countryInfo } from '../game/countries'
+import { provinceInfo } from '../game/provinces'
 
 // 6 người kéo — mỗi đội 3 người. Slot (team + vị trí) mới là khóa, vì 2 slot
 // có thể dùng chung 1 file model (Hương là bản đổi màu áo của Lan, Bình là
@@ -513,32 +513,32 @@ export default function TugScene({ liveRef }) {
     const flagSpots = []
     for (let i = 0; i < 6; i++) flagSpots.push({ x: -12 + i * 4.8, z: -10, ry: (i % 2 ? Math.PI : 0) })
     placeEnv('/track/quaternius-flag.glb', flagSpots)
-    // ── Cờ quốc gia: 3 lá cờ của 3 nước tặng quà nhiều nhất, cắm thành hàng
-    // sau hố bùn, cao hơn đầu người để nhìn rõ từ xa. Mỗi lá là 1 mặt phẳng
-    // vẽ cờ emoji lên canvas (iPhone vẽ cờ thật, máy không có font cờ thì
-    // hiện 2 chữ mã nước) — đổi cờ khi bảng xếp hạng quốc gia đổi.
-    const countryFlagSlots = []
+    // ── Bảng tên tỉnh: 3 tỉnh tặng quà nhiều nhất, tên viết lên bảng treo
+    // trên cột sau hố bùn, cao hơn đầu người để nhìn rõ từ xa. Bảng của
+    // tỉnh dẫn đầu nền vàng, 2 bảng sau nền xanh đậm — đổi bảng khi BXH
+    // tỉnh thành đổi.
+    const provinceBannerSlots = []
     for (let i = 0; i < 3; i++) {
       const grp = new THREE.Group()
-      grp.position.set((i - 1) * 3, 0, -5)
+      grp.position.set((i - 1) * 3.2, 0, -5)
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.2, 6), mat(0x495057))
       pole.position.y = 1.1
       grp.add(pole)
       const canvas = document.createElement('canvas')
-      canvas.width = 128; canvas.height = 96
+      canvas.width = 256; canvas.height = 96
       const tex = new THREE.CanvasTexture(canvas)
       tex.colorSpace = THREE.SRGBColorSpace
       const cloth = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.95, 0.7),
+        new THREE.PlaneGeometry(1.6, 0.6),
         new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide }),
       )
-      cloth.position.set(0.5, 1.95, 0)
+      cloth.position.set(0, 1.95, 0)
       grp.add(cloth)
       grp.visible = false
       scene.add(grp)
-      countryFlagSlots.push({ grp, canvas, tex, cloth })
+      provinceBannerSlots.push({ grp, canvas, tex, cloth })
     }
-    let countryFlagSig = ''
+    let provinceBannerSig = ''
     // ── Đồi xa 3D: khối cầu dẹt xanh dịu (mờ dần theo sương mù, không
     // tranh với nhân vật), bao quanh chân trời như núi đồi ngoài đời.
     const hillMat = new THREE.MeshStandardMaterial({ color: 0x6f9a63, roughness: 1, metalness: 0 })
@@ -1078,27 +1078,36 @@ export default function TugScene({ liveRef }) {
       ropeGroup.rotation.z = -smoothRopeX * 0.012 // dây hơi nghiêng theo hướng kéo
       flagCloth.rotation.y = Math.sin(time * 3) * 0.25 // cờ phấp phới
       for (const b of banners) b.flag.position.x = b.base + Math.sin(time * 2 + (b.teamId === 'A' ? 0 : 2)) * 0.08
-      // ── Cờ quốc gia: top 3 nước đổi thì vẽ lại cờ trên 3 cột sau hố bùn ──
-      if (st.countryTotals) {
-        const top3 = Object.values(st.countryTotals).sort((a, b) => b.power - a.power).slice(0, 3)
+      // ── Bảng tên tỉnh: top 3 tỉnh đổi thì vẽ lại bảng trên 3 cột sau hố bùn ──
+      if (st.provinceTotals) {
+        const top3 = Object.values(st.provinceTotals).sort((a, b) => b.power - a.power).slice(0, 3)
         const sig = top3.map((c) => c.code).join('|')
-        if (sig !== countryFlagSig) {
-          countryFlagSig = sig
-          countryFlagSlots.forEach((slot, i) => {
+        if (sig !== provinceBannerSig) {
+          provinceBannerSig = sig
+          provinceBannerSlots.forEach((slot, i) => {
             const c = top3[i]
             slot.grp.visible = !!c
             if (!c) return
             const ctx = slot.canvas.getContext('2d')
-            ctx.clearRect(0, 0, 128, 96)
-            ctx.font = '72px serif'
+            ctx.clearRect(0, 0, 256, 96)
+            // Nền bảng: tỉnh dẫn đầu vàng, 2 tỉnh sau xanh đậm.
+            ctx.fillStyle = i === 0 ? '#f59f00' : '#08261a'
+            ctx.beginPath()
+            ctx.roundRect(4, 8, 248, 80, 16)
+            ctx.fill()
+            ctx.strokeStyle = i === 0 ? '#fff3bf' : 'rgba(255,255,255,.35)'
+            ctx.lineWidth = 3
+            ctx.stroke()
+            ctx.fillStyle = '#ffffff'
+            ctx.font = '900 40px sans-serif'
             ctx.textAlign = 'center'
             ctx.textBaseline = 'middle'
-            ctx.fillText(countryInfo(c.code)?.flag || '🌍', 64, 52)
+            ctx.fillText(provinceInfo(c.code)?.short || c.code, 128, 50)
             slot.tex.needsUpdate = true
             slot.cloth.rotation.y = Math.sin(time * 2 + i) * 0.15
           })
         }
-        countryFlagSlots.forEach((slot, i) => {
+        provinceBannerSlots.forEach((slot, i) => {
           if (slot.grp.visible) slot.cloth.rotation.y = Math.sin(time * 2.5 + i * 1.3) * 0.18
         })
       }

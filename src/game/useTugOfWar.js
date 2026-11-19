@@ -6,10 +6,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   DEFAULT_SETTINGS, GiftEngine, TEAMS, advance, applyLikes, applyPull,
-  clearBxh, countryLeader, createMatch, giftIcon, joinTeam, migrateGiftMap, pushToast,
-  startMatch, startRound, topCountries, topGifters, topLikers,
+  clearBxh, provinceLeader, createMatch, giftIcon, joinTeam, migrateGiftMap, pushToast,
+  startMatch, startRound, topProvinces, topGifters, topLikers,
 } from './engine'
-import { countryInfo, detectCountry } from './countries'
+import { provinceInfo, detectProvince } from './provinces'
 import { createSeqTracker, normalizeEvent, parseCommand } from './adapter'
 import { TikTokWS, WS_STATUS } from './wsClient'
 import { SoundEngine } from './sound'
@@ -27,16 +27,16 @@ export function loadBxh() {
     return {
       giftTotals: raw.giftTotals && typeof raw.giftTotals === 'object' ? raw.giftTotals : {},
       likeTotals: raw.likeTotals && typeof raw.likeTotals === 'object' ? raw.likeTotals : {},
-      countryTotals: raw.countryTotals && typeof raw.countryTotals === 'object' ? raw.countryTotals : {},
+      provinceTotals: raw.provinceTotals && typeof raw.provinceTotals === 'object' ? raw.provinceTotals : {},
     }
-  } catch { return { giftTotals: {}, likeTotals: {}, countryTotals: {} } }
+  } catch { return { giftTotals: {}, likeTotals: {}, provinceTotals: {} } }
 }
 function saveBxh(state) {
   try {
     localStorage.setItem(BXH_KEY, JSON.stringify({
       giftTotals: state.giftTotals || {},
       likeTotals: state.likeTotals || {},
-      countryTotals: state.countryTotals || {},
+      provinceTotals: state.provinceTotals || {},
     }))
   } catch { /* ignore */ }
 }
@@ -77,7 +77,7 @@ export function useTugOfWar() {
     const bxh = loadBxh()
     st.giftTotals = bxh.giftTotals
     st.likeTotals = bxh.likeTotals
-    st.countryTotals = bxh.countryTotals
+    st.provinceTotals = bxh.provinceTotals
     stateRef.current = st
   }
   const engineRef = useRef(null)
@@ -148,7 +148,7 @@ export function useTugOfWar() {
       effects: [...s.effects],
       stats: { ...s.stats },
       likes: s.likes,
-      bxh: { gifters: topGifters(s, 3), likers: topLikers(s, 3), countries: topCountries(s, 3) },
+      bxh: { gifters: topGifters(s, 3), likers: topLikers(s, 3), provinces: topProvinces(s, 3) },
       queueLength: engineRef.current.queueLength,
       settings: s.settings,
       pendingJoins: pendingJoinsRef.current.length,
@@ -170,8 +170,8 @@ export function useTugOfWar() {
       roundWinner: s.roundWinner, matchWinner: s.matchWinner,
       streak: { ...s.streak }, finalTime: !!s.finalTime, timeAddedByLikes: s.timeAddedByLikes || 0,
       feed: s.feed.slice(-8), stats: s.stats, likes: s.likes,
-      bxh: { gifters: topGifters(s, 3), likers: topLikers(s, 3), countries: topCountries(s, 3) },
-      countryLeader: countryLeader(s),
+      bxh: { gifters: topGifters(s, 3), likers: topLikers(s, 3), provinces: topProvinces(s, 3) },
+      provinceLeader: provinceLeader(s),
       queueLength: engineRef.current.queueLength,
       settings: s.settings, wsStatus, wsDetail,
       wsLog: wsLog.slice(0, 30),
@@ -193,13 +193,13 @@ export function useTugOfWar() {
     const sound = soundRef.current
 
     if (ev.kind === 'chat') {
-      // Chọn nước: bình luận cờ (🇻🇳) hoặc mã nước (VN) để quà của mình
-      // tính cho nước đó. Chỉ hiện toast khi mới chọn/đổi nước.
-      const cc = detectCountry(ev.comment, '')
-      if (cc && s.userCountry[ev.userId] !== cc) {
-        s.userCountry[ev.userId] = cc
-        const info = countryInfo(cc)
-        if (info) pushToast(s, `${info.flag} ${ev.nickname} đã chọn ${info.name}! Tặng quà để đưa ${info.name} lên số 1!`)
+      // Chọn tỉnh: bình luận tên tỉnh/thành (Hà Nội, Sài Gòn, Đà Nẵng...)
+      // để quà của mình tính cho tỉnh đó. Chỉ hiện toast khi mới chọn/đổi tỉnh.
+      const pv = detectProvince(ev.comment, '')
+      if (pv && s.userProvince[ev.userId] !== pv) {
+        s.userProvince[ev.userId] = pv
+        const info = provinceInfo(pv)
+        if (info) pushToast(s, `📍 ${ev.nickname} đã chọn ${info.name}! Tặng quà để đưa ${info.name} lên số 1!`)
       }
       const cmd = parseCommand(ev.comment)
       const streamerId = (s.settings.streamerId || '').trim().toLowerCase()
@@ -231,14 +231,14 @@ export function useTugOfWar() {
     }
 
     if (ev.kind === 'gift') {
-      // Nước của người tặng: cờ/mã trong chữ kèm quà hoặc tên người tặng,
-      // rồi tới nước người đó đã chọn trước đó.
-      const cc = detectCountry(ev.text || '', ev.nickname) || s.userCountry[ev.userId] || null
-      if (cc) s.userCountry[ev.userId] = cc
+      // Tỉnh của người tặng: tên tỉnh trong chữ kèm quà hoặc tên người tặng,
+      // rồi tới tỉnh người đó đã chọn trước đó.
+      const pv = detectProvince(ev.text || '', ev.nickname) || s.userProvince[ev.userId] || null
+      if (pv) s.userProvince[ev.userId] = pv
       const res = engineRef.current.receive({
         id: ev.id || `${ev.userId}:${ev.giftName}:${Date.now()}`,
         giftName: ev.giftName, nickname: ev.nickname, userId: ev.userId, text: ev.text || '',
-        avatar: ev.avatar || '', country: cc || '',
+        avatar: ev.avatar || '', province: pv || '',
       })
       if (res.ok) logWs(`${giftIcon(ev.giftName)} ${ev.nickname} tặng ${ev.giftName} → kéo ${TEAMS[res.teamId].name} (${res.power} lực)`)
       else if (res.reason === 'unmapped') logWs(`${giftIcon(ev.giftName)} ${ev.nickname} tặng ${ev.giftName} (chưa gán lực kéo — xem tab Quà & Lực kéo)`)
@@ -305,16 +305,16 @@ export function useTugOfWar() {
         const settings = s.settings
         const giftTotals = s.giftTotals || {}
         const likeTotals = s.likeTotals || {}
-        const countryTotals = s.countryTotals || {}
-        const userCountry = s.userCountry || {}
+        const provinceTotals = s.provinceTotals || {}
+        const userProvince = s.userProvince || {}
         const fresh = createMatch(settings)
         fresh.paused = false
         fresh.pendingJoins = []
         // Trận mới: xóa tỉ số + đội, nhưng GIỮ BXH (BXH tính cả phiên).
         fresh.giftTotals = giftTotals
         fresh.likeTotals = likeTotals
-        fresh.countryTotals = countryTotals
-        fresh.userCountry = userCountry
+        fresh.provinceTotals = provinceTotals
+        fresh.userProvince = userProvince
         stateRef.current = fresh
         engineRef.current = new GiftEngine(fresh)
         pendingJoinsRef.current = []
@@ -478,18 +478,18 @@ export function useTugOfWar() {
       // Tặng ngay 1 món quà to khi bắt đầu (để xem hiệu ứng pháo hoa + BXH).
       engineRef.current.receive({
         id: 'demo-gift-start', giftName: 'hạc giấy',
-        nickname: 'Bạn Tặng Thử', userId: 'demo-g1', text: 'A', country: 'VN',
+        nickname: 'Bạn Tặng Thử', userId: 'demo-g1', text: 'A', province: 'hanoi',
       })
     }, 800)
     const powers = [1, 5, 10, 25]
     let n = 0
     // Quà mẫu (đi qua đường quà thật để hiện hiệu ứng + lên BXH): xen kẽ
     // quà nhỏ (hộp quà mở) + quà to (pháo hoa), 3 người tặng thay phiên —
-    // mỗi người 1 nước để xem BXH quốc gia + cờ tung bay.
+    // mỗi người 1 tỉnh để xem BXH tỉnh thành + tên tỉnh trên hiệu ứng quà.
     const demoGifters = [
-      { nickname: 'Bạn Tặng Thử', userId: 'demo-g1', country: 'VN' },
-      { nickname: 'Hoa Thử', userId: 'demo-g2', country: 'US' },
-      { nickname: 'Nam Thử', userId: 'demo-g3', country: 'KR' },
+      { nickname: 'Bạn Tặng Thử', userId: 'demo-g1', province: 'hanoi' },
+      { nickname: 'Hoa Thử', userId: 'demo-g2', province: 'hcm' },
+      { nickname: 'Nam Thử', userId: 'demo-g3', province: 'danang' },
     ]
     const demoGifts = ['hoa hồng', 'bing chilling', 'nước hoa', 'hạc giấy']
     const demoLikers = [
@@ -515,7 +515,7 @@ export function useTugOfWar() {
           engineRef.current.receive({
             id: `demo-gift-${n}`, giftName,
             nickname: g.nickname, userId: g.userId,
-            text: teamId, country: g.country,
+            text: teamId, province: g.province,
           })
         }
         if (n % 7 === 0) {

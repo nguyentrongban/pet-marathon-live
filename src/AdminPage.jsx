@@ -3,7 +3,7 @@
 // BroadcastChannel (mở 2 tab cùng trình duyệt). Không chứa logic game.
 
 import { useEffect, useRef, useState } from 'react'
-import { ClipboardList, Coins, Flame, Gift, Heart, MessageCircle, Pause, Play, Plug, PlugZap, Plus, RotateCcw, Scale, Settings, TestTube, Trash2, Trophy, User, Users, Zap } from 'lucide-react'
+import { ClipboardList, Coins, Flame, Gift, Heart, MapPin, MessageCircle, Pause, Play, Plug, PlugZap, Plus, RotateCcw, Scale, Settings, TestTube, Trash2, Trophy, User, Users, Zap } from 'lucide-react'
 import { onSyncMessage, postCmd, postSnapshotReq } from './game/sync'
 import GiftIcon from './components/GiftIcon'
 import { BALANCE_NOTE, DEFAULT_SETTINGS, TEAMS, giftPrice, giftTier } from './game/engine'
@@ -148,6 +148,13 @@ export default function AdminPage() {
             <ul className="pml-admin-list">
               {snap.bxh.likers.map((g, i) => (
                 <li key={`l${i}`}><span className="pml-ic"><Heart size={14} /></span> #{i + 1} {g.nickname} · {g.likes} tim</li>
+              ))}
+            </ul>
+          )}
+          {(snap?.bxh?.provinces?.length || 0) > 0 && (
+            <ul className="pml-admin-list">
+              {snap.bxh.provinces.map((c, i) => (
+                <li key={`p${i}`}><span className="pml-ic"><MapPin size={14} /></span> #{i + 1} {c.name} · <span className="pml-ic"><Zap size={14} /></span> {Math.round(c.power)} lực · {c.count || 0} quà{i === 0 ? ' · dẫn đầu ×1,5' : ''}</li>
               ))}
             </ul>
           )}
