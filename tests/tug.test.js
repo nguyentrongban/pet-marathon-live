@@ -5,12 +5,12 @@
 // bằng 100 người, tắt dần) · tim = +thời gian (1 người đủ 100 tim → +10s).
 import assert from 'node:assert'
 import { createSeqTracker, normalizeEvent, parseCommand } from '../src/game/adapter.js'
-import { detectProvince, provinceInfo } from '../src/game/provinces.js'
+import { detectProvince, provinceInfo, provinceRank } from '../src/game/provinces.js'
 import {
   DEFAULT_SETTINGS, GiftEngine, MEMBER_TYPES, TEAMS, advance, applyLikes,
   applyPull, clearBxh, createMatch, endRound, findMember, giftBoost, giftPrice, giftTier,
-  giftTeam, joinTeam, migrateGiftMap, parseTeamJoin, pushToast, startMatch, startRound,
-  provinceLeader, teamStrength, tick, topGifters, topLikers, topProvinces, visibleMembers,
+  giftTeam, joinProvince, joinTeam, migrateGiftMap, parseTeamJoin, pushToast, startMatch, startRound,
+  syncProvinceTeams, teamLabel, provinceLeader, teamStrength, tick, topGifters, topLikers, topProvinces, topProvincesByComments, visibleMembers,
 } from '../src/game/engine.js'
 
 let pass = 0, fail = 0
@@ -685,6 +685,123 @@ test('quà qua GiftEngine vẫn mang tỉnh sang hiệu ứng + BXH; kéo thử 
   applyPull(s, 'A', 25, { nickname: 'Admin thử', userId: 'admin', province: 'hanoi' }, '', { gift: false })
   assert.equal(topProvinces(s, 3).length, 1, 'kéo thử không lên BXH tỉnh thành')
 })
+
+// ── 18. Đấu tỉnh thành: cmt tỉnh là vào đội, top 2 tỉnh đông nhất đấu ───
+test('bình luận tỉnh → tự vào đội tỉnh đó (chưa đủ 2 tỉnh thì làm challenger)', () => {
+  const s = createMatch({ ...DEFAULT_SETTINGS })
+  // Chưa có đội tỉnh nào (chưa đủ 2 tỉnh) → vào làm challenger, chưa có đội.
+  const r1 = joinProvince(s, 'hanoi', 'Lan', 'lan')
+  assert.equal(r1.ok, true)
+  assert.equal(r1.challenger, true, '1 tỉnh thì chưa thành đội, làm challenger')
+  assert.equal(r1.teamId, null)
+  assert.equal(s.userProvince.lan, 'hanoi')
+  assert.equal(findMember(s, 'lan'), null, 'challenger chưa vào đội nào')
+  // Đủ 2 tỉnh → 2 tỉnh đó thành 2 đội, người vào đội tỉnh mình.
+  joinProvince(s, 'hcm', 'Hoa', 'hoa')
+  joinProvince(s, 'danang', 'Nam', 'nam')
+  // Chưa sync (chưa bắt đầu màn) nên đội vẫn chưa chọn — sync ở đầu màn.
+  assert.equal(s.provinceTeams.A, null, 'chưa bắt đầu màn thì chưa chọn đội')
+  const picked = syncProvinceTeams(s)
+  assert.equal(picked.A, 'hanoi', 'Hà Nội (1 người) đứng đầu')
+  assert.equal(picked.B, 'hcm', 'TP.HCM đứng thứ 2')
+  assert.equal(findMember(s, 'lan').teamId, 'A', 'Lan (Hà Nội) vào đội A')
+  assert.equal(findMember(s, 'hoa').teamId, 'B', 'Hoa (TP.HCM) vào đội B')
+  assert.equal(findMember(s, 'nam'), null, 'Nam (Đà Nẵng, hạng 3) vẫn là challenger')
+})
+
+test('top 2 tỉnh theo SỐ NGƯỜI bình luận (mỗi người tính 1 lần, chống spam)', () => {
+  const s = createMatch({ ...DEFAULT_SETTINGS })
+  // 1 người bình luận 3 lần vẫn chỉ tính 1 (joinProvince ghi đè, không cộng dồn).
+  joinProvince(s, 'hanoi', 'Lan', 'lan')
+  joinProvince(s, 'hanoi', 'Lan', 'lan')
+  joinProvince(s, 'hanoi', 'Lan', 'lan')
+  joinProvince(s, 'hcm', 'Hoa', 'hoa')
+  joinProvince(s, 'hcm', 'Minh', 'minh')
+  joinProvince(s, 'danang', 'Nam', 'nam')
+  const top = topProvincesByComments(s, 2)
+  assert.equal(top.length, 2)
+  assert.equal(top[0].code, 'hcm', 'TP.HCM 2 người phải đứng đầu')
+  assert.equal(top[0].count, 2)
+  assert.equal(top[1].code, 'hanoi', 'Hà Nội 1 người đứng thứ 2')
+  assert.equal(top[1].count, 1, '1 người bình luận 3 lần vẫn chỉ tính 1')
+})
+
+test('đổi tỉnh: rời đội cũ, vào đội tỉnh mới; màn sau chọn lại top 2', () => {
+  const s = freshMatch()
+  // freshMatch có sẵn Lan (A) + Minh (B) vào bằng joinTeam (không có tỉnh).
+  joinProvince(s, 'hanoi', 'Lan', 'lan2')
+  joinProvince(s, 'hcm', 'Hoa', 'hoa2')
+  joinProvince(s, 'hanoi', 'Minh', 'minh2')
+  syncProvinceTeams(s)
+  assert.equal(s.provinceTeams.A, 'hanoi')
+  assert.equal(s.provinceTeams.B, 'hcm')
+  assert.equal(teamLabel(s, 'A'), 'Hà Nội', 'tên đội A hiện tên tỉnh')
+  assert.equal(teamLabel(s, 'B'), 'TP. Hồ Chí Minh')
+  // Lan (không tỉnh, vào bằng joinTeam) vẫn giữ đội A; Minh (không tỉnh) giữ đội B.
+  assert.equal(findMember(s, 'lan').teamId, 'A', 'người không có tỉnh giữ nguyên đội')
+  assert.equal(findMember(s, 'minh').teamId, 'B')
+  // Đà Nẵng vượt lên: thêm 3 người Đà Nẵng → màn sau Đà Nẵng thay TP.HCM.
+  joinProvince(s, 'danang', 'Nam', 'nam2')
+  joinProvince(s, 'danang', 'An', 'an2')
+  joinProvince(s, 'danang', 'Binh', 'binh2')
+  syncProvinceTeams(s)
+  assert.equal(s.provinceTeams.A, 'danang', 'Đà Nẵng 3 người vượt lên đứng đầu')
+  assert.equal(s.provinceTeams.B, 'hanoi', 'Hà Nội 2 người xuống thứ 2')
+  assert.equal(findMember(s, 'hoa2'), null, 'Hoa (TP.HCM, rớt top 2) thành challenger')
+  assert.equal(findMember(s, 'nam2').teamId, 'A', 'Nam (Đà Nẵng) vào đội A màn sau')
+  // Thắng màn thì chúc mừng tên tỉnh.
+  s.phase = 'pulling'
+  endRound(s, 'A')
+  assert.ok(s.feed.some((f) => f.text.includes('Đà Nẵng') && f.text.includes('thắng màn')), 'thắng màn phải chúc mừng tên tỉnh')
+})
+
+test('quà của người ủng hộ tỉnh challenger vẫn tính cho tỉnh + kéo cho đội yếu', () => {
+  const s = freshMatch()
+  joinProvince(s, 'hanoi', 'Lan', 'lan2')
+  joinProvince(s, 'hcm', 'Hoa', 'hoa2')
+  joinProvince(s, 'danang', 'Nam', 'nam2')
+  syncProvinceTeams(s)
+  assert.equal(s.provinceTeams.A, 'hanoi')
+  assert.equal(s.provinceTeams.B, 'hcm')
+  // Nam (Đà Nẵng, challenger) tặng quà: vẫn tính cho Đà Nẵng (BXH tỉnh).
+  const r = applyPull(s, giftTeam(s, 'nam2', ''), 25, { nickname: 'Nam', userId: 'nam2', province: 'danang' }, 'nước hoa')
+  assert.equal(r.ok, true)
+  assert.equal(r.province, 'danang', 'quà của challenger vẫn mang tỉnh')
+  assert.equal(topProvinces(s, 3)[0].code, 'danang', 'quà challenger vẫn lên BXH tỉnh')
+  assert.equal(r.teamId, giftTeam(s, 'nam2', ''), 'quà challenger kéo cho đội (theo luật giftTeam)')
+})
+
+test('hạng Free Fire cho tỉnh theo tổng lực quà (Đồng → Đại Kiện Tướng)', () => {
+  assert.equal(provinceRank(0).name, 'Đồng')
+  assert.equal(provinceRank(9).name, 'Đồng')
+  assert.equal(provinceRank(10).name, 'Bạc')
+  assert.equal(provinceRank(24).name, 'Bạc')
+  assert.equal(provinceRank(25).name, 'Vàng')
+  assert.equal(provinceRank(49).name, 'Vàng')
+  assert.equal(provinceRank(50).name, 'Bạch Kim')
+  assert.equal(provinceRank(99).name, 'Bạch Kim')
+  assert.equal(provinceRank(100).name, 'Kim Cương')
+  assert.equal(provinceRank(249).name, 'Kim Cương')
+  assert.equal(provinceRank(250).name, 'Huyền Thoại')
+  assert.equal(provinceRank(499).name, 'Huyền Thoại')
+  assert.equal(provinceRank(500).name, 'Đại Kiện Tướng')
+  assert.equal(provinceRank(9999).name, 'Đại Kiện Tướng')
+  assert.equal(provinceRank(100).color, '#4dabf7', 'Kim Cương màu xanh dương')
+  assert.equal(provinceRank(500).color, '#ff6b6b', 'Đại Kiện Tướng màu đỏ')
+})
+
+test('Xóa BXH thì xóa luôn người ủng hộ tỉnh + đội tỉnh (bắt đầu live mới)', () => {
+  const s = freshMatch()
+  joinProvince(s, 'hanoi', 'Lan', 'lan2')
+  joinProvince(s, 'hcm', 'Hoa', 'hoa2')
+  syncProvinceTeams(s)
+  assert.equal(s.provinceTeams.A, 'hanoi')
+  clearBxh(s)
+  assert.equal(Object.keys(s.provinceUsers).length, 0, 'xóa BXH thì xóa người ủng hộ tỉnh')
+  assert.equal(s.provinceTeams.A, null, 'xóa BXH thì xóa đội tỉnh')
+  assert.equal(Object.keys(s.userProvince).length, 0)
+})
+
 
 console.log('\n🪢 KÉO CO LIVE — test logic kéo co (luật v2: số đông vs quà, tim = giờ)')
 for (const line of results) console.log(line)

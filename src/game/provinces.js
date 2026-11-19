@@ -90,3 +90,20 @@ function provinceInText(text) {
 export function detectProvince(text, nickname) {
   return provinceInText(text) || provinceInText(nickname) || null
 }
+
+// ─── Hạng Free Fire cho tỉnh (theo tổng lực quà của tỉnh) ────────────────
+// Kiểu hạng đấu rank quen thuộc với người chơi Free Fire: tỉnh càng được
+// tặng nhiều quà thì càng lên hạng cao. Dùng để khoe trong BXH tỉnh thành.
+export const PROVINCE_RANKS = [
+  { min: 500, name: 'Đại Kiện Tướng', color: '#ff6b6b' },
+  { min: 250, name: 'Huyền Thoại', color: '#e599f7' },
+  { min: 100, name: 'Kim Cương', color: '#4dabf7' },
+  { min: 50, name: 'Bạch Kim', color: '#74c0fc' },
+  { min: 25, name: 'Vàng', color: '#f59f00' },
+  { min: 10, name: 'Bạc', color: '#adb5bd' },
+  { min: 0, name: 'Đồng', color: '#b0793f' },
+]
+export function provinceRank(power) {
+  const p = Math.max(0, Math.round(power || 0))
+  return PROVINCE_RANKS.find((r) => p >= r.min) || PROVINCE_RANKS[PROVINCE_RANKS.length - 1]
+}

@@ -6,8 +6,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   DEFAULT_SETTINGS, GiftEngine, TEAMS, advance, applyLikes, applyPull,
-  clearBxh, provinceLeader, createMatch, giftIcon, joinTeam, migrateGiftMap, pushToast,
-  startMatch, startRound, topProvinces, topGifters, topLikers,
+  clearBxh, provinceLeader, createMatch, giftIcon, joinProvince, joinTeam, migrateGiftMap, pushToast,
+  startMatch, startRound, topProvinces, topProvincesByComments, topGifters, topLikers,
 } from './engine'
 import { provinceInfo, detectProvince } from './provinces'
 import { createSeqTracker, normalizeEvent, parseCommand } from './adapter'
@@ -149,6 +149,9 @@ export function useTugOfWar() {
       stats: { ...s.stats },
       likes: s.likes,
       bxh: { gifters: topGifters(s, 3), likers: topLikers(s, 3), provinces: topProvinces(s, 3) },
+      // Đấu tỉnh thành: 2 tỉnh đang đấu + top tỉnh theo số người bình luận.
+      provinceTeams: { ...s.provinceTeams },
+      provinceBattle: topProvincesByComments(s, 2),
       queueLength: engineRef.current.queueLength,
       settings: s.settings,
       pendingJoins: pendingJoinsRef.current.length,
@@ -172,6 +175,8 @@ export function useTugOfWar() {
       feed: s.feed.slice(-8), stats: s.stats, likes: s.likes,
       bxh: { gifters: topGifters(s, 3), likers: topLikers(s, 3), provinces: topProvinces(s, 3) },
       provinceLeader: provinceLeader(s),
+      provinceTeams: { ...s.provinceTeams },
+      provinceBattle: topProvincesByComments(s, 2),
       queueLength: engineRef.current.queueLength,
       settings: s.settings, wsStatus, wsDetail,
       wsLog: wsLog.slice(0, 30),
@@ -194,12 +199,16 @@ export function useTugOfWar() {
 
     if (ev.kind === 'chat') {
       // Chọn tỉnh: bình luận tên tỉnh/thành (Hà Nội, Sài Gòn, Đà Nẵng...)
-      // để quà của mình tính cho tỉnh đó. Chỉ hiện toast khi mới chọn/đổi tỉnh.
+      // để quà của mình tính cho tỉnh đó. Bình luận tỉnh là TỰ VÀO ĐỘI
+      // tỉnh đó luôn (đấu tỉnh thành) — chỉ hiện toast khi mới chọn/đổi tỉnh.
       const pv = detectProvince(ev.comment, '')
-      if (pv && s.userProvince[ev.userId] !== pv) {
-        s.userProvince[ev.userId] = pv
-        const info = provinceInfo(pv)
-        if (info) pushToast(s, `📍 ${ev.nickname} đã chọn ${info.name}! Tặng quà để đưa ${info.name} lên số 1!`)
+      if (pv) {
+        const isNew = s.userProvince[ev.userId] !== pv
+        const jr = joinProvince(s, pv, ev.nickname, ev.userId, ev.avatar || '')
+        if (isNew && jr.ok) {
+          const info = provinceInfo(pv)
+          if (info) pushToast(s, `📍 ${ev.nickname} đã chọn ${info.name}! Tặng quà để đưa ${info.name} lên số 1!`)
+        }
       }
       const cmd = parseCommand(ev.comment)
       const streamerId = (s.settings.streamerId || '').trim().toLowerCase()
@@ -307,14 +316,19 @@ export function useTugOfWar() {
         const likeTotals = s.likeTotals || {}
         const provinceTotals = s.provinceTotals || {}
         const userProvince = s.userProvince || {}
+        const provinceUsers = s.provinceUsers || {}
+        const provinceTeams = s.provinceTeams || { A: null, B: null }
         const fresh = createMatch(settings)
         fresh.paused = false
         fresh.pendingJoins = []
-        // Trận mới: xóa tỉ số + đội, nhưng GIỮ BXH (BXH tính cả phiên).
+        // Trận mới: xóa tỉ số + đội, nhưng GIỮ BXH (BXH tính cả phiên)
+        // + GIỮ người ủng hộ từng tỉnh (họ vẫn đang xem live).
         fresh.giftTotals = giftTotals
         fresh.likeTotals = likeTotals
         fresh.provinceTotals = provinceTotals
         fresh.userProvince = userProvince
+        fresh.provinceUsers = provinceUsers
+        fresh.provinceTeams = provinceTeams
         stateRef.current = fresh
         engineRef.current = new GiftEngine(fresh)
         pendingJoinsRef.current = []
@@ -468,12 +482,14 @@ export function useTugOfWar() {
     if (typeof window === 'undefined') return
     if (new URLSearchParams(window.location.search).get('demo') !== '1') return
     const t1 = setTimeout(() => {
-      joinTeam(stateRef.current, 'A', 'Lan Thử', 'demo-a')
-      joinTeam(stateRef.current, 'A', 'Hoa Thử', 'demo-a2')
-      joinTeam(stateRef.current, 'A', 'Nam Thử', 'demo-a3')
-      joinTeam(stateRef.current, 'B', 'Minh Thử', 'demo-b')
-      joinTeam(stateRef.current, 'B', 'Linh Thử', 'demo-b2')
-      joinTeam(stateRef.current, 'B', 'Tuấn Thử', 'demo-b3')
+      // Demo: khán giả bình luận tỉnh để vào đội tỉnh đó (đấu tỉnh thành) —
+      // 2 tỉnh có nhiều người bình luận nhất sẽ thành 2 đội ở màn đầu.
+      joinProvince(stateRef.current, 'hanoi', 'Lan Thử', 'demo-a')
+      joinProvince(stateRef.current, 'hcm', 'Hoa Thử', 'demo-a2')
+      joinProvince(stateRef.current, 'danang', 'Nam Thử', 'demo-a3')
+      joinProvince(stateRef.current, 'hanoi', 'Minh Thử', 'demo-b')
+      joinProvince(stateRef.current, 'hcm', 'Linh Thử', 'demo-b2')
+      joinProvince(stateRef.current, 'danang', 'Tuấn Thử', 'demo-b3')
       doStart()
       // Tặng ngay 1 món quà to khi bắt đầu (để xem hiệu ứng pháo hoa + BXH).
       engineRef.current.receive({

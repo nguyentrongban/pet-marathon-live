@@ -143,6 +143,63 @@ input, select { font-family: inherit; }
 }
 @keyframes pml-banner-in { from { transform: translateY(8px); } }
 
+/* ── BOOYAH! (Free Fire): chữ thắng to giữa màn hình, hiện 3 giây ── */
+.pml-booyah {
+  position: absolute; top: 34%; left: 0; right: 0; z-index: 10; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center;
+}
+.pml-booyah-word {
+  font-size: 56px; font-weight: 900; letter-spacing: 1px; line-height: 1;
+  background: linear-gradient(180deg, #fff3bf 0%, #ffd60a 45%, #f59f00 70%, #e8590c 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 3px 0 rgba(0,0,0,.55)) drop-shadow(0 8px 14px rgba(0,0,0,.45));
+  transform: rotate(-3deg);
+  animation: pml-booyah-pop .45s cubic-bezier(.34, 1.56, .64, 1);
+}
+.pml-booyah-sub {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 16px; font-weight: 900; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,.7);
+  background: rgba(8, 38, 26, .7); border-radius: 999px; padding: 6px 14px;
+  animation: pml-banner-in .3s ease-out .15s;
+}
+@keyframes pml-booyah-pop {
+  0% { transform: rotate(-3deg) scale(.3); }
+  60% { transform: rotate(-3deg) scale(1.12); }
+  100% { transform: rotate(-3deg) scale(1); }
+}
+
+/* ── Thùng tiếp tế Free Fire: thả dù rơi xuống khi có quà to ── */
+.pml-airdrop {
+  position: absolute; left: 50%; top: -110px; z-index: 4; pointer-events: none;
+  transform: translateX(-50%);
+  animation: pml-airdrop-fall 1.1s cubic-bezier(.3, .7, .4, 1) forwards;
+}
+.pml-airdrop-chute {
+  width: 70px; height: 34px; margin: 0 auto;
+  background: linear-gradient(90deg, #ff6b6b 0 25%, #fff 25% 50%, #ff6b6b 50% 75%, #fff 75% 100%);
+  border-radius: 70px 70px 0 0;
+}
+.pml-airdrop-crate {
+  width: 46px; height: 46px; margin: 2px auto 0;
+  background: linear-gradient(180deg, #a67c52, #8d6b3f);
+  border: 2px solid #5c4326; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; color: #ffe08a;
+  box-shadow: 0 6px 14px rgba(0,0,0,.45);
+}
+@keyframes pml-airdrop-fall {
+  0% { top: -110px; }
+  70% { top: 20%; }
+  85% { top: 24%; }
+  100% { top: 22%; }
+}
+
+/* ── Huy hiệu hạng Free Fire + tag ĐANG ĐẤU trong BXH tỉnh ── */
+.pml-bxh-rankbadge {
+  font-size: 9px; font-weight: 900; color: #fff; line-height: 1;
+  border-radius: 999px; padding: 2px 5px; flex: none; white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(0,0,0,.4);
+}
+
 /* ── Thẻ chờ chọn đội: nhỏ, ở dưới, chạm để bắt đầu ── */
 .pml-wait-tap { position: absolute; inset: 0; z-index: 3; }
 .pml-wait-card {
@@ -322,7 +379,7 @@ input, select { font-family: inherit; }
   position: absolute; left: 10px; bottom: calc(104px + env(safe-area-inset-bottom)); z-index: 6;
   background: rgba(8, 38, 26, .68); border: 1px solid rgba(255,255,255,.2); border-radius: 14px;
   padding: 8px 10px; backdrop-filter: blur(6px); box-shadow: 0 4px 14px rgba(0,0,0,.3);
-  pointer-events: none; max-width: 46vw;
+  pointer-events: none; max-width: 52vw;
 }
 .pml-bxh-title { font-size: 12px; font-weight: 900; letter-spacing: .5px; margin-bottom: 4px; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
 .pml-bxh-sec { margin-top: 5px; }
@@ -397,6 +454,12 @@ input, select { font-family: inherit; }
 }
 .pml-admin-btns button:disabled { opacity: .45; cursor: default; }
 .pml-admin-list { font-size: 14px; line-height: 1.7; padding-left: 20px; }
+.pml-admin-rankbadge {
+  font-size: 10px; font-weight: 900; color: #fff; line-height: 1;
+  border-radius: 999px; padding: 2px 6px; white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(0,0,0,.4);
+}
+.pml-admin-battle { font-weight: 700; background: rgba(245, 159, 0, .15); border-radius: 8px; padding: 2px 8px; margin-left: -8px; }
 .pml-admin-list.mono { font-family: ui-monospace, monospace; font-size: 12.5px; list-style: none; padding-left: 0; }
 .pml-admin-list .dim { opacity: .55; }
 .pml-admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }

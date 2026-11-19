@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import {
   BookOpen, Cable, Flag, Flame, Gift, Hand, Handshake, Heart,
-  Hourglass, MapPin, MessageCircle, Pause, Shield, Sparkles, Star, Timer, Trophy,
+  Hourglass, MapPin, MessageCircle, Package, Pause, Shield, Sparkles, Star, Timer, Trophy,
   User, Users, Volume2, VolumeX, Waves, X, Zap,
 } from 'lucide-react'
 import TugScene from './components/TugScene'
@@ -14,7 +14,7 @@ import AdminPage from './AdminPage'
 import { useTugOfWar } from './game/useTugOfWar'
 import { WS_STATUS } from './game/wsClient'
 import { TEAMS } from './game/engine'
-import { provinceInfo } from './game/provinces'
+import { provinceInfo, provinceRank } from './game/provinces'
 
 const APP_VERSION = '2.0.0-tug'
 
@@ -81,6 +81,15 @@ function DisplayGame() {
   const bxh = s?.bxh || { gifters: [], likers: [] }
   const provinces = bxh.provinces || []
   const hasBxh = (bxh.gifters?.length || 0) > 0 || (bxh.likers?.length || 0) > 0 || provinces.length > 0
+  // Đấu tỉnh thành: tên đội = tên tỉnh đang đấu (chưa có tỉnh thì Đội Đỏ/Xanh).
+  const teamLabel = (teamId) => {
+    const code = s?.provinceTeams?.[teamId]
+    return code ? (provinceInfo(code)?.name || TEAMS[teamId].name) : TEAMS[teamId].name
+  }
+  const teamShort = (teamId) => {
+    const code = s?.provinceTeams?.[teamId]
+    return code ? (provinceInfo(code)?.short || TEAMS[teamId].name) : TEAMS[teamId].name
+  }
 
   return (
     <div className="pml-app" data-version={APP_VERSION}>
@@ -103,7 +112,7 @@ function DisplayGame() {
         <div className="pml-score">
           <div className={`pml-team red ${rope > 0.3 ? 'leading' : ''}`}>
             <TeamDot team="A" />
-            <span className="pt-name">Đội Đỏ</span>
+            <span className="pt-name">{teamLabel('A')}</span>
             <MemberIcons members={TEAMS.A.members} />
             <Stars n={teamA?.roundWins || 0} total={s?.settings?.winsToMatch || 2} />
             <span className="pt-count"><Users size={14} /> {s?.teamCounts?.A || 0} · <Zap size={14} /> {Math.round(teamA?.pullRate || 0)}</span>
@@ -114,7 +123,7 @@ function DisplayGame() {
           </div>
           <div className={`pml-team blue ${rope < -0.3 ? 'leading' : ''}`}>
             <TeamDot team="B" />
-            <span className="pt-name">Đội Xanh</span>
+            <span className="pt-name">{teamLabel('B')}</span>
             <MemberIcons members={TEAMS.B.members} />
             <Stars n={teamB?.roundWins || 0} total={s?.settings?.winsToMatch || 2} />
             <span className="pt-count"><Users size={14} /> {s?.teamCounts?.B || 0} · <Zap size={14} /> {Math.round(teamB?.pullRate || 0)}</span>
@@ -130,15 +139,15 @@ function DisplayGame() {
               <div className="rm-center" />
               <div className="rm-flag" style={{ left: `${50 - rope * 48}%` }}><Flag size={16} fill="currentColor" /></div>
             </div>
-            <div className="rm-labels"><span><TeamDot team="A" /> Đỏ thắng</span><span>Xanh thắng <TeamDot team="B" /></span></div>
+            <div className="rm-labels"><span><TeamDot team="A" /> {teamShort('A')} thắng</span><span>{teamShort('B')} thắng <TeamDot team="B" /></span></div>
             {comebackTeam && phase === 'pulling' && (
-              <div className="rm-comeback"><Zap size={15} /> CƠ HỘI CUỐI: {TEAMS[comebackTeam].name} kéo ×2!</div>
+              <div className="rm-comeback"><Zap size={15} /> CƠ HỘI CUỐI: {teamLabel(comebackTeam)} kéo ×2!</div>
             )}
             {s?.finalTime && phase === 'pulling' && (
               <div className="rm-comeback"><Timer size={15} /> GIỜ CHÓT: quà tặng ×2 lực kéo!</div>
             )}
             {s?.luckyStar && phase === 'countdown' && (
-              <div className="rm-lucky"><Star size={15} fill="currentColor" /> {TEAMS[s.luckyStar.team].name} có ngôi sao may mắn — bắt đầu lệch về phía mình!</div>
+              <div className="rm-lucky"><Star size={15} fill="currentColor" /> {teamLabel(s.luckyStar.team)} có ngôi sao may mắn — bắt đầu lệch về phía mình!</div>
             )}
           </div>
         )}
@@ -180,6 +189,11 @@ function DisplayGame() {
         )}
         {giftFx && giftFx.big && (
           <div className="pml-fireworks" key={giftFx.id}>
+            {/* Thùng tiếp tế Free Fire: quà to thì thùng tiếp tế thả dù rơi xuống. */}
+            <div className="pml-airdrop">
+              <div className="pml-airdrop-chute" />
+              <div className="pml-airdrop-crate"><Package size={24} /></div>
+            </div>
             <span className="fw-burst fw-1" />
             <span className="fw-burst fw-2" />
             <span className="fw-burst fw-3" />
@@ -190,6 +204,20 @@ function DisplayGame() {
               <div className="fw-name">{giftFx.sender}</div>
               <div className="fw-sub">tặng {giftFx.gift || 'quà to'} · <Zap size={14} /> {Math.round(giftFx.power)} lực kéo!</div>
               {giftProvince && <div className="fw-province"><MapPin size={15} /> {giftProvince.name}{giftFx.provinceBonus ? ' · Tỉnh dẫn đầu ×1,5!' : ''}</div>}
+            </div>
+          </div>
+        )}
+
+        {/* ── BOOYAH! (Free Fire): thắng màn/trận thì hiện to giữa màn hình ──
+             Hiện 3 giây đầu của màn nghỉ (React gỡ khi hết 3s, không dùng
+             animation mờ dần ở container để tránh kẹt opacity trên máy yếu). */}
+        {((phase === 'roundEnd' && s?.roundWinner && (s.nextRoundIn || 0) > 5) || (phase === 'matchEnd' && s?.matchWinner && (s.matchEndIn || 0) > 12)) && (
+          <div className="pml-booyah">
+            <div className="pml-booyah-word">BOOYAH!</div>
+            <div className="pml-booyah-sub">
+              {phase === 'matchEnd'
+                ? <><Trophy size={18} /> {teamLabel(s.matchWinner)} VÔ ĐỊCH!</>
+                : <><TeamDot team={s.roundWinner} /> {teamLabel(s.roundWinner)} thắng màn {s.round}!</>}
             </div>
           </div>
         )}
@@ -226,13 +254,17 @@ function DisplayGame() {
             {provinces.length > 0 && (
               <div className="pml-bxh-sec">
                 <div className="pml-bxh-head"><MapPin size={13} /> Tỉnh thành dẫn đầu</div>
-                {provinces.map((c, i) => (
-                  <div className="pml-bxh-row" key={`c${i}`}>
-                    <span className={`pml-bxh-rank r${i + 1}`}>{i + 1}</span>
-                    <span className="pml-bxh-name">{c.short || c.name}</span>
-                    <span className="pml-bxh-val"><Zap size={12} /> {Math.round(c.power)}</span>
-                  </div>
-                ))}
+                {provinces.map((c, i) => {
+                  const rank = provinceRank(c.power)
+                  return (
+                    <div className="pml-bxh-row" key={`c${i}`}>
+                      <span className={`pml-bxh-rank r${i + 1}`}>{i + 1}</span>
+                      <span className="pml-bxh-name">{c.short || c.name}</span>
+                      <span className="pml-bxh-rankbadge" style={{ background: rank.color }}>{rank.name}</span>
+                      <span className="pml-bxh-val">{Math.round(c.power)}</span>
+                    </div>
+                  )
+                })}
                 <div className="pml-bxh-leader">📍 {provinces[0].name} dẫn đầu — quà của {provinces[0].name} mạnh hơn ×1,5!</div>
               </div>
             )}
@@ -249,8 +281,8 @@ function DisplayGame() {
           <>
             <div className="pml-wait-tap" onClick={game.start} />
             <div className="pml-wait-card" onClick={game.start}>
-              <div className="pml-wait-line"><MessageCircle size={14} /> <b>A</b> = Đội Đỏ <TeamDot team="A" /> · <b>B</b> = Đội Xanh <TeamDot team="B" /> · <Gift size={14} /> Quà để kéo · <Heart size={14} fill="currentColor" /> 100 tim = +10s kéo</div>
-              <div className="pml-wait-line"><MapPin size={14} /> Bình luận tên tỉnh của bạn (Hà Nội, Sài Gòn, Đà Nẵng...) — tỉnh dẫn đầu, quà tặng ×1,5 lực kéo!</div>
+              <div className="pml-wait-line"><MessageCircle size={14} /> <b>A</b> = đội bên trái <TeamDot team="A" /> · <b>B</b> = đội bên phải <TeamDot team="B" /> · <Gift size={14} /> Quà để kéo · <Heart size={14} fill="currentColor" /> 100 tim = +10s kéo</div>
+              <div className="pml-wait-line"><MapPin size={14} /> Bình luận tên tỉnh của bạn (Hà Nội, Sài Gòn, Đà Nẵng...) để vào đội tỉnh đó — 2 tỉnh có nhiều người bình luận nhất sẽ kéo nhau!</div>
               <div className="pml-wait-go"><Hand size={16} /> Chạm màn hình để bắt đầu kéo co!</div>
               {s?.pendingJoins > 0 && <div className="pml-wait-sub"><Hourglass size={13} /> {s.pendingJoins} bạn đang chờ vào đội</div>}
             </div>
@@ -260,7 +292,7 @@ function DisplayGame() {
         {/* ── Thắng màn / hòa: dải nhỏ ở dưới, sân 3D vẫn thấy rõ ── */}
         {phase === 'roundEnd' && s?.roundWinner && (
           <div className="pml-result-banner">
-            <TeamDot team={s.roundWinner} /> {TEAMS[s.roundWinner].name} thắng màn {s.round}! · <TeamDot team="A" /> {teamA?.roundWins || 0} — {teamB?.roundWins || 0} <TeamDot team="B" /> · Màn {s.round + 1} sau {Math.max(0, Math.ceil(s.nextRoundIn || 0))}s…
+            <TeamDot team={s.roundWinner} /> {teamLabel(s.roundWinner)} thắng màn {s.round}! · <TeamDot team="A" /> {teamA?.roundWins || 0} — {teamB?.roundWins || 0} <TeamDot team="B" /> · Màn {s.round + 1} sau {Math.max(0, Math.ceil(s.nextRoundIn || 0))}s…
           </div>
         )}
         {phase === 'roundEnd' && !s?.roundWinner && (
@@ -272,7 +304,7 @@ function DisplayGame() {
         {/* ── Vô địch trận: dải nhỏ ở dưới ── */}
         {phase === 'matchEnd' && s?.matchWinner && (
           <div className="pml-result-banner champion">
-            <Trophy size={15} /> {TEAMS[s.matchWinner].name.toUpperCase()} VÔ ĐỊCH! · <TeamDot team="A" /> {teamA?.roundWins || 0} — {teamB?.roundWins || 0} <TeamDot team="B" /> · <Gift size={14} /> {s?.stats?.gifts || 0} quà{(s?.streak?.[s.matchWinner] || 0) > 1 ? <> · <Flame size={14} /> Thắng {s.streak[s.matchWinner]} trận liên tiếp!</> : ''} · Trận mới sau {Math.max(0, Math.ceil(s.matchEndIn || 0))}s…
+            <Trophy size={15} /> {teamLabel(s.matchWinner).toUpperCase()} VÔ ĐỊCH! · <TeamDot team="A" /> {teamA?.roundWins || 0} — {teamB?.roundWins || 0} <TeamDot team="B" /> · <Gift size={14} /> {s?.stats?.gifts || 0} quà{(s?.streak?.[s.matchWinner] || 0) > 1 ? <> · <Flame size={14} /> Thắng {s.streak[s.matchWinner]} trận liên tiếp!</> : ''} · Trận mới sau {Math.max(0, Math.ceil(s.matchEndIn || 0))}s…
           </div>
         )}
 
@@ -281,9 +313,9 @@ function DisplayGame() {
           <div className="pml-guide">
             <button className="pml-guide-x" onClick={() => setGuideOpen(false)} aria-label="Đóng hướng dẫn"><X size={18} /></button>
             <h3><BookOpen size={17} /> CÁCH CHƠI</h3>
-            <p><MessageCircle size={14} /> Bình luận <b>A</b> — vào Đội Đỏ <TeamDot team="A" /> · <b>B</b> — vào Đội Xanh <TeamDot team="B" /> (hoặc bình luận tên người: Anh Hùng/Miyo/Mia = Đỏ, Lan/Hương/Bình = Xanh). Mỗi người vào đội là <b>+1 lực kéo liên tục</b> — đội đông người kéo mạnh hơn!</p>
-            <p><Gift size={14} /> Tặng quà — quà là cú bùng sức mạnh: hoa hồng 1 xu = 1 lực · hạc giấy 99 xu = <b>100 lực, bằng 100 người!</b> Quà to có thể kéo ngang cả đội đông.</p>
-            <p><MapPin size={14} /> Tỉnh thành — bình luận tên tỉnh/thành của bạn (Hà Nội, Sài Gòn, Đà Nẵng...) để chọn tỉnh của mình. Quà tặng được tính cho tỉnh đó, tỉnh dẫn đầu được thưởng <b>×1,5 lực kéo</b> — tặng quà để đưa tỉnh mình lên số 1!</p>
+            <p><MessageCircle size={14} /> Bình luận <b>tên tỉnh của bạn</b> (Hà Nội, Sài Gòn, Đà Nẵng...) — tự vào đội tỉnh đó luôn! <b>2 tỉnh có nhiều người bình luận nhất sẽ thành 2 đội kéo nhau</b> ở mỗi màn (màn sau chọn lại 2 tỉnh đông nhất). Mỗi người vào đội là <b>+1 lực kéo liên tục</b> — tỉnh đông người kéo mạnh hơn! (Bình luận <b>A</b>/<b>B</b> để vào đội bên trái/phải, hoặc tên người: Anh Hùng/Miyo/Mia = trái, Lan/Hương/Bình = phải.)</p>
+            <p><Gift size={14} /> Tặng quà — quà là cú bùng sức mạnh: hoa hồng 1 xu = 1 lực · hạc giấy 99 xu = <b>100 lực, bằng 100 người!</b> Quà to có thể kéo ngang cả đội đông. Quà to (≥25 lực) thì có <b>thùng tiếp tế thả dù</b> rơi xuống!</p>
+            <p><MapPin size={14} /> Tỉnh thành — quà tặng được tính cho tỉnh của người tặng, tỉnh dẫn đầu BXH quà được thưởng <b>×1,5 lực kéo</b>. Tỉnh còn có <b>hạng Free Fire</b> theo tổng lực quà: Đồng → Bạc → Vàng → Bạch Kim → Kim Cương → Huyền Thoại → Đại Kiện Tướng — tặng quà để đưa tỉnh mình lên hạng cao!</p>
             <p><Heart size={14} fill="currentColor" /> Thả tim — <b>1 người thả đủ 100 tim thì màn kéo dài thêm 10 giây</b> (tối đa +60 giây). Tim không kéo dây, chỉ thêm giờ!</p>
             <p><Zap size={14} /> Đội đang thua quá nửa đường được nhân đôi lực kéo (cơ hội cuối). <b>10 giây cuối: quà tặng ×2!</b></p>
             <p><Trophy size={14} /> Thắng 2 màn trước thì vô địch trận (best of 3 — tối đa 3 màn, 2–1 là vô địch). Đội thắng màn được ngôi sao may mắn ở màn sau!</p>

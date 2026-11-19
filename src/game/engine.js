@@ -228,6 +228,10 @@ export function createMatch(settings = DEFAULT_SETTINGS) {
     giftTotals: {}, likeTotals: {}, provinceTotals: {},
     // Tỉnh mỗi người đã chọn (bình luận tên tỉnh): userId → mã tỉnh.
     userProvince: {},
+    // Người ủng hộ từng tỉnh (để chọn 2 đội đấu): userId → { nickname, avatar, province, joinedAt }.
+    provinceUsers: {},
+    // 2 tỉnh đang đấu (mã tỉnh cho đội A/B; null = chưa đủ 2 tỉnh → đội Đỏ/Xanh thường).
+    provinceTeams: { A: null, B: null },
     nextRoundIn: 0, matchEndIn: 0,
     settings: { ...settings },
     stats: { gifts: 0, pulls: 0 },
@@ -278,6 +282,8 @@ export function clearBxh(state) {
   state.likeTotals = {}
   state.provinceTotals = {}
   state.userProvince = {}
+  state.provinceUsers = {}
+  state.provinceTeams = { A: null, B: null }
 }
 
 // ─── BXH Tỉnh thành: quà tặng tính theo tỉnh của người tặng ──────────────
@@ -303,6 +309,95 @@ export function topProvinces(state, n = 3) {
 // Tỉnh đang dẫn đầu BXH tỉnh thành (null nếu chưa ai tặng quà có tỉnh).
 export function provinceLeader(state) {
   return topProvinces(state, 1)[0] || null
+}
+
+// Tên hiển thị của 1 đội: nếu đội đó là 1 tỉnh đang đấu thì hiện tên tỉnh,
+// chưa có tỉnh thì hiện tên đội thường (Đội Đỏ / Đội Xanh).
+export function teamLabel(state, teamId) {
+  const code = state.provinceTeams?.[teamId]
+  if (code) {
+    const info = provinceInfo(code)
+    if (info) return info.name
+  }
+  return TEAMS[teamId].name
+}
+
+// ─── Đấu tỉnh thành: bình luận tên tỉnh là tự vào đội tỉnh đó ────────────
+// 2 tỉnh có NHIỀU NGƯỜI bình luận nhất (mỗi người tính 1 lần, tránh 1
+// người spam) thành 2 đội kéo dây. Chọn lại 2 tỉnh này ở ĐẦU MỖI MÀN
+// (xem syncProvinceTeams) — tỉnh nào vượt lên thì được đấu màn sau.
+// Tỉnh chưa vào top 2 vẫn có người ủng hộ (challenger): bình luận + quà
+// của họ vẫn tính cho tỉnh đó, chờ vượt lên top 2 màn sau.
+export function topProvincesByComments(state, n = 2) {
+  const counts = {}
+  for (const u of Object.values(state.provinceUsers || {})) {
+    if (!u.province) continue
+    counts[u.province] = (counts[u.province] || 0) + 1
+  }
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, n)
+    .map(([code, count]) => ({ code, count, ...(provinceInfo(code) || { name: code, short: code }) }))
+}
+
+// Bình luận tên tỉnh → vào đội tỉnh đó ngay (tự vào đội luôn).
+// Tỉnh đó đang là 1 trong 2 đội đấu thì vào đội đó; chưa phải thì làm
+// người ủng hộ (challenger) — bình luận vẫn tính để tỉnh đó lên top 2.
+export function joinProvince(state, code, nickname, userId, avatar = '') {
+  if (!code || !userId) return { ok: false, reason: 'no-province' }
+  const member = findMember(state, userId)
+  if (state.userProvince[userId] === code && member) return { ok: true, teamId: member.teamId, province: code, already: true }
+  // Đổi tỉnh: rời đội cũ trước (1 người chỉ ở 1 đội).
+  if (member) {
+    const t = state.teams[member.teamId]
+    t.members = t.members.filter((m) => m.userId !== userId)
+  }
+  state.userProvince[userId] = code
+  state.provinceUsers[userId] = { nickname, avatar: avatar || '', province: code, joinedAt: state.now }
+  const teamId = state.provinceTeams?.A === code ? 'A' : state.provinceTeams?.B === code ? 'B' : null
+  if (!teamId) return { ok: true, province: code, teamId: null, challenger: true }
+  const team = state.teams[teamId]
+  if (team.members.length >= 100) return { ok: false, reason: 'full', teamId, province: code }
+  team.members.push({ nickname, userId, avatar: avatar || '', teamId, pulls: 0, gifts: 0, joinedAt: state.now })
+  return { ok: true, teamId, province: code }
+}
+
+// Chọn lại 2 đội đấu ở ĐẦU MỖI MÀN: 2 tỉnh có nhiều người bình luận nhất.
+// Xếp lại thành viên theo tỉnh (giữ pulls/gifts của người đã ở đội).
+// Người không có tỉnh (vào bằng A/B/tên người) giữ nguyên đội cũ.
+export function syncProvinceTeams(state) {
+  const top = topProvincesByComments(state, 2)
+  const codeA = top[0] ? top[0].code : null
+  const codeB = top[1] ? top[1].code : null
+  state.provinceTeams = { A: codeA, B: codeB }
+  // Giữ lại pulls/gifts của thành viên cũ theo userId.
+  const oldById = {}
+  for (const t of TEAM_IDS) for (const m of state.teams[t].members) oldById[m.userId] = m
+  const next = { A: [], B: [] }
+  // 1) Người có tỉnh: xếp theo tỉnh (đội top-2, không thì challenger).
+  for (const [userId, u] of Object.entries(state.provinceUsers || {})) {
+    const teamId = u.province === codeA ? 'A' : u.province === codeB ? 'B' : null
+    if (!teamId) continue
+    const old = oldById[userId]
+    const m = old && old.teamId === teamId
+      ? old
+      : { nickname: u.nickname, userId, avatar: u.avatar || '', teamId, pulls: old?.pulls || 0, gifts: old?.gifts || 0, joinedAt: u.joinedAt ?? state.now }
+    m.teamId = teamId
+    next[teamId].push(m)
+  }
+  // 2) Người không có tỉnh (vào bằng A/B/tên người): giữ nguyên đội cũ.
+  for (const m of Object.values(oldById)) {
+    if (!state.userProvince[m.userId] && !next[m.teamId].some((x) => x.userId === m.userId)) {
+      next[m.teamId].push(m)
+    }
+  }
+  // Giữ thứ tự vào đội (mới vào ở cuối) để 3 người mới nhất hiện trên sân.
+  for (const t of TEAM_IDS) {
+    next[t].sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0))
+    state.teams[t].members = next[t]
+    state.teams[t].pullRate = state.teams[t].members.length + state.teams[t].boost
+  }
+  return { A: codeA, B: codeB }
 }
 
 // ─── Toast: có ai vào xem / theo dõi / chia sẻ thì hiện 2 giây rồi mất ────
@@ -513,6 +608,9 @@ export function startRound(state) {
     // Đội thắng màn trước được bắt đầu màn sau lệch 0,12 về phía mình.
     state.rope = state.luckyStar.team === 'A' ? 0.12 : -0.12
   }
+  // Đấu tỉnh thành: chọn lại 2 đội đấu ở đầu mỗi màn — 2 tỉnh có nhiều
+  // người bình luận nhất. Tỉnh nào vượt lên thì được đấu màn này.
+  syncProvinceTeams(state)
   state.roundWinner = null
   state.phase = 'countdown'
   state.countdown = state.settings.countdownSeconds
@@ -532,6 +630,8 @@ export function startRound(state) {
 
 export function endRound(state, winnerTeamId) {
   const winner = winnerTeamId ? TEAMS[winnerTeamId] : null
+  // Chúc mừng tỉnh thắng (đấu tỉnh thành) — hiện tên tỉnh thay tên đội thường.
+  const winnerLabel = winnerTeamId ? teamLabel(state, winnerTeamId) : null
   state.roundWinner = winnerTeamId
   state.phase = 'roundEnd'
   state.nextRoundIn = 8
@@ -540,7 +640,7 @@ export function endRound(state, winnerTeamId) {
     state.luckyStar = { team: winnerTeamId }
     state.effects.push({ id: nextId('fx'), kind: 'confetti', team: winnerTeamId, t: 0, dur: 2.5 })
     state.effects.push({ id: nextId('fx'), kind: 'splash', team: otherTeam(winnerTeamId), t: 0, dur: 1.5 })
-    pushFeed(state, 'win', `${winner.emoji} ${winner.name} thắng màn ${state.round}! Tỉ số ${state.teams.A.roundWins}–${state.teams.B.roundWins}`)
+    pushFeed(state, 'win', `${winner.emoji} ${winnerLabel} thắng màn ${state.round}! Tỉ số ${state.teams.A.roundWins}–${state.teams.B.roundWins}`)
   } else {
     pushFeed(state, 'info', `🤝 Màn ${state.round} hòa! Không đội nào thắng.`)
   }
@@ -552,7 +652,7 @@ export function endRound(state, winnerTeamId) {
     state.streak[winnerTeamId] = (state.streak[winnerTeamId] || 0) + 1
     state.streak[otherTeam(winnerTeamId)] = 0
     state.effects.push({ id: nextId('fx'), kind: 'confetti', team: winnerTeamId, t: 0, dur: 4 })
-    pushFeed(state, 'win', `🏆 ${winner.name} VÔ ĐỊCH TRẬN ĐẤU! (${state.teams.A.roundWins}–${state.teams.B.roundWins})${state.streak[winnerTeamId] > 1 ? ` · 🔥 Thắng ${state.streak[winnerTeamId]} trận liên tiếp!` : ''}`)
+    pushFeed(state, 'win', `🏆 ${winnerLabel} VÔ ĐỊCH TRẬN ĐẤU! (${state.teams.A.roundWins}–${state.teams.B.roundWins})${state.streak[winnerTeamId] > 1 ? ` · 🔥 Thắng ${state.streak[winnerTeamId]} trận liên tiếp!` : ''}`)
   }
 }
 

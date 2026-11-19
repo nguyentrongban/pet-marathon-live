@@ -7,6 +7,7 @@ import { ClipboardList, Coins, Flame, Gift, Heart, MapPin, MessageCircle, Pause,
 import { onSyncMessage, postCmd, postSnapshotReq } from './game/sync'
 import GiftIcon from './components/GiftIcon'
 import { BALANCE_NOTE, DEFAULT_SETTINGS, TEAMS, giftPrice, giftTier } from './game/engine'
+import { provinceRank } from './game/provinces'
 
 const TABS = [
   { id: 'tug', label: (<><span className="pml-ic"><Users size={16} /></span> Kéo co</>) },
@@ -153,9 +154,16 @@ export default function AdminPage() {
           )}
           {(snap?.bxh?.provinces?.length || 0) > 0 && (
             <ul className="pml-admin-list">
-              {snap.bxh.provinces.map((c, i) => (
-                <li key={`p${i}`}><span className="pml-ic"><MapPin size={14} /></span> #{i + 1} {c.name} · <span className="pml-ic"><Zap size={14} /></span> {Math.round(c.power)} lực · {c.count || 0} quà{i === 0 ? ' · dẫn đầu ×1,5' : ''}</li>
-              ))}
+              {(snap?.provinceBattle?.length || 0) >= 2 && (
+                <li className="pml-admin-battle"><span className="pml-ic"><Trophy size={14} /></span> Đang đấu: <b>{snap.provinceBattle[0].name}</b> ({snap.provinceBattle[0].count} người) vs <b>{snap.provinceBattle[1].name}</b> ({snap.provinceBattle[1].count} người) — 2 tỉnh đông người bình luận nhất</li>
+              )}
+              {snap.bxh.provinces.map((c, i) => {
+                const rank = provinceRank(c.power)
+                const battling = snap?.provinceTeams?.A === c.code || snap?.provinceTeams?.B === c.code
+                return (
+                  <li key={`p${i}`}><span className="pml-ic"><MapPin size={14} /></span> #{i + 1} {c.name} · <span className="pml-admin-rankbadge" style={{ background: rank.color }}>{rank.name}</span> · <span className="pml-ic"><Zap size={14} /></span> {Math.round(c.power)} lực · {c.count || 0} quà{i === 0 ? ' · dẫn đầu ×1,5' : ''}{battling ? ' · ĐANG ĐẤU' : ''}</li>
+                )
+              })}
             </ul>
           )}
           <div className="pml-admin-btns">
