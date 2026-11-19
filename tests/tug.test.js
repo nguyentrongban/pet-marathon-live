@@ -994,6 +994,23 @@ await asyncTest('hết 5 phút nghỉ thì thử lại FPT.AI, được thì n�
   }
 })
 
+await asyncTest('thử giọng máy trực tiếp: deviceOnly thì bỏ qua FPT.AI, đọc ngay bằng giọng máy', async () => {
+  const spoken = mockBrowser()
+  const origFetch = globalThis.fetch
+  try {
+    let fetchCalls = 0
+    globalThis.fetch = async () => { fetchCalls++; throw new Error('no network') }
+    const v = new VoiceEngine({ apiBase: 'https://api.test', enabled: false })
+    assert.equal(v.speakDeviceTest('thử giọng máy trực tiếp'), true)
+    await waitIdle(v)
+    assert.equal(fetchCalls, 0, 'thử giọng máy thì không gọi FPT.AI')
+    assert.ok(spoken.some((t) => t.includes('thử giọng máy trực tiếp')), 'đọc ngay bằng giọng máy')
+  } finally {
+    globalThis.fetch = origFetch
+    unmockBrowser()
+  }
+})
+
 
 console.log('\n🪢 KÉO CO LIVE — test logic kéo co (luật v2: số đông vs quà, tim = giờ)')
 for (const line of results) console.log(line)

@@ -396,9 +396,9 @@ export function useTugOfWar() {
         saveSettings(s.settings)
         takeSnap()
       } else if (msg.cmd === 'testVoice') {
-        // Thử giọng đọc: đọc 1 câu ngay, kể cả khi đang tắt tiếng (để
-        // streamer kiểm tra giọng có kêu không).
-        voiceRef.current?.speak('Hà Nội đang dẫn đầu, thử giọng đọc bình luận!', 'high', true)
+        // Thử giọng đọc: đọc thẳng bằng giọng máy (không chờ FPT.AI), kể
+        // cả khi đang tắt tiếng (để streamer kiểm tra giọng có kêu không).
+        voiceRef.current?.speakDeviceTest('Hà Nội đang dẫn đầu, thử giọng đọc bình luận!')
         takeSnap()
       } else if (msg.cmd === 'connect') {
         try { localStorage.setItem(WS_KEY, JSON.stringify({ wsUrl: msg.wsUrl, key: msg.key })) } catch { /* ignore */ }
@@ -646,9 +646,16 @@ export function useTugOfWar() {
     takeSnap()
   }, [takeSnap])
 
+  // Thử giọng ngay trên tab màn hình này: cử chỉ chạm ở đây mở khóa âm
+  // thanh cho tab này — bấm thử trong Admin thì tab màn hình không có cử
+  // chỉ nên iPhone chặn, nghe không thấy gì.
+  const testVoice = useCallback(() => {
+    voiceRef.current?.speakDeviceTest('Hà Nội đang dẫn đầu, thử giọng đọc bình luận!')
+  }, [])
+
   return {
     stateRef, snap, wsStatus, wsDetail, wsLog, muted,
-    start: doStart, toggleMute,
+    start: doStart, toggleMute, testVoice,
     apiConfigured: Boolean(import.meta.env?.VITE_API_URL),
   }
 }

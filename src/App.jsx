@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import {
   BookOpen, Cable, ChevronDown, ChevronUp, Flag, Flame, Gift, Hand, Handshake, Heart,
-  Hourglass, MapPin, MessageCircle, Package, Pause, Shield, Sparkles, Star, Timer, Trophy,
+  Hourglass, MapPin, MessageCircle, Mic, Package, Pause, Shield, Sparkles, Star, Timer, Trophy,
   User, Users, Volume2, VolumeX, Waves, X, Zap,
 } from 'lucide-react'
 import TugScene from './components/TugScene'
@@ -106,6 +106,12 @@ function DisplayGame() {
             <span className={`pml-dot ${connected ? 'on' : ''}`} title={connected ? 'Đã nối TikTok LIVE' : 'Chưa nối TikTok'} />
             <button className="pml-iconbtn" onClick={game.toggleMute} aria-label="Bật/tắt tiếng">
               {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+            </button>
+            {/* Thử giọng đọc ngay trên tab màn hình này: bấm là đọc liền bằng
+                giọng máy (không chờ FPT.AI). Bấm thử trong Admin thì tab màn
+                hình không có cử chỉ chạm nên iPhone chặn, nghe không thấy. */}
+            <button className="pml-iconbtn" onClick={game.testVoice} aria-label="Thử giọng đọc" title="Thử giọng đọc">
+              <Mic size={20} />
             </button>
             {!present && <button className="pml-helpbtn" onClick={() => setGuideOpen(!guideOpen)}><BookOpen size={15} /> Cách chơi</button>}
           </div>

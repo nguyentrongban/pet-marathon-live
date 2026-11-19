@@ -102,7 +102,9 @@ export class VoiceEngine {
 
   // force=true: đọc kể cả khi đang tắt (dùng cho nút "Thử giọng đọc" trong
   // Admin — streamer bấm để kiểm tra giọng thì phải nghe thấy).
-  speak(text, priority = 'normal', force = false) {
+  // deviceOnly=true: đọc thẳng bằng giọng máy, không gọi FPT.AI (phản hồi
+  // ngay — dùng để thử xem điện thoại có đọc được không, không chờ mạng).
+  speak(text, priority = 'normal', force = false, deviceOnly = false) {
     if (!this.enabled && !force) return false
     const t = String(text || '').trim()
     if (!t) return false
@@ -119,9 +121,15 @@ export class VoiceEngine {
       if (p <= this.queue[dropIdx].priority) return false
       this.queue.splice(dropIdx, 1)
     }
-    this.queue.push({ text: t, priority: p })
+    this.queue.push({ text: t, priority: p, deviceOnly: !!deviceOnly })
     this.pump()
     return true
+  }
+
+  // Thử giọng máy trực tiếp (không qua FPT.AI, không chờ mạng): dùng cho
+  // nút thử giọng trên màn hiển thị — bấm là đọc ngay.
+  speakDeviceTest(text) {
+    return this.speak(text, 'high', true, true)
   }
 
   pump() {
@@ -142,8 +150,9 @@ export class VoiceEngine {
   }
 
   async playItem(item) {
-    // Thử FPT.AI trước (trừ khi đang trong 5 phút nghỉ sau lỗi/hết lượt).
-    if (this.mode === 'fpt' || Date.now() >= this.fptCooldownUntil) {
+    // Thử FPT.AI trước (trừ khi đang trong 5 phút nghỉ sau lỗi/hết lượt,
+    // hoặc câu này chỉ định đọc bằng giọng máy).
+    if (!item.deviceOnly && (this.mode === 'fpt' || Date.now() >= this.fptCooldownUntil)) {
       const url = await this.fetchFptAudio(item.text)
       if (url) {
         const played = await this.playAudio(url)
@@ -231,6 +240,9 @@ export class VoiceEngine {
         }
         utter.onend = () => finish(true)
         utter.onerror = () => finish(false)
+        // iPhone hay bị kẹt 1 câu đọc cũ (nói dở rồi dừng, câu sau không
+        // đọc được nữa) — hủy hết câu đang chờ trước khi đọc câu mới.
+        try { synth.cancel() } catch { /* ignore */ }
         synth.speak(utter)
         // An toàn: quá 30 giây chưa xong thì dừng (tránh kẹt hàng đợi).
         const timeoutId = setTimeout(() => {
