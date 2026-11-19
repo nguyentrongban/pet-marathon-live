@@ -1,4 +1,4 @@
-# Blueprint Render — PET MARATHON LIVE (tất cả đều chạy trên Render, không dùng nền tảng khác)
+# Blueprint Render — KÉO CO LIVE (tất cả đều chạy trên Render, không dùng nền tảng khác)
 # Cách dùng: push repo này lên GitHub, vào Render Dashboard → New → Blueprint → chọn repo này.
 # Render sẽ tạo 2 dịch vụ: web tĩnh (game) + web service (API lưu kết quả).
 services:
@@ -20,7 +20,7 @@ services:
       - key: VITE_SUPABASE_ANON_KEY
         sync: false
 
-  # ── API lưu kết quả đua (Web Service, Node tối giản, thư mục server/) ──
+  # ── API lưu kết quả trận (Web Service, Node tối giản, thư mục server/) ──
   - type: web
     name: pet-marathon-live-api
     env: node

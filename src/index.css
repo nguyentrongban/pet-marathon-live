@@ -1,4 +1,4 @@
-/* ─── PET MARATHON LIVE · index.css ─────────────────────────────────────────
+/* ─── KÉO CO LIVE · index.css ─────────────────────────────────────────
    Giao diện điện thoại trước (9:16), tiếng Việt, nút to, chữ rõ. */
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; padding: 0; height: 100%; }
@@ -29,11 +29,11 @@ input, select { font-family: inherit; }
 }
 .pml-topbar > * { pointer-events: auto; }
 .pml-logo {
-  font-weight: 900; font-size: 17px; letter-spacing: .8px; color: #fff;
+  font-weight: 900; font-size: 15px; letter-spacing: .4px; color: #fff;
   background: linear-gradient(135deg, rgba(6, 60, 40, .72), rgba(6, 60, 40, .45));
-  border: 1px solid rgba(255, 255, 255, .22); border-radius: 999px; padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, .22); border-radius: 999px; padding: 6px 10px;
   text-shadow: 0 1px 4px rgba(0,0,0,.5); backdrop-filter: blur(6px);
-  box-shadow: 0 4px 16px rgba(0,0,0,.25); display: flex; align-items: center; gap: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25); display: flex; align-items: center; gap: 6px; white-space: nowrap;
 }
 .pml-logo b {
   background: linear-gradient(90deg, #ffd60a, #ffb703);
@@ -56,63 +56,98 @@ input, select { font-family: inherit; }
 }
 .pml-helpbtn { font-weight: 800; }
 
-.pml-standings {
+/* ── Bảng tỉ số 2 đội ── */
+.pml-score {
   position: absolute; top: calc(56px + env(safe-area-inset-top)); left: 10px; right: 10px; z-index: 4;
-  display: flex; flex-direction: column; gap: 5px; pointer-events: none;
+  display: flex; gap: 7px; align-items: stretch; pointer-events: none;
 }
-.pml-row {
-  display: flex; align-items: center; gap: 7px;
-  background: rgba(8, 38, 26, .55); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 5px 11px 5px 7px;
-  font-size: 12.5px; backdrop-filter: blur(6px); box-shadow: 0 4px 14px rgba(0,0,0,.22);
+.pml-team {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  background: rgba(8, 38, 26, .55); border: 1px solid rgba(255,255,255,.18); border-radius: 16px; padding: 7px 6px 6px;
+  backdrop-filter: blur(6px); box-shadow: 0 4px 14px rgba(0,0,0,.22);
 }
-.pml-row.lead {
-  background: linear-gradient(90deg, rgba(255, 214, 10, .34), rgba(255, 183, 3, .16));
-  border-color: rgba(255, 214, 10, .75); box-shadow: 0 4px 18px rgba(255, 200, 0, .35);
+.pml-team.red.leading { border-color: rgba(255, 80, 80, .9); box-shadow: 0 4px 18px rgba(255, 60, 60, .45); }
+.pml-team.blue.leading { border-color: rgba(80, 160, 255, .9); box-shadow: 0 4px 18px rgba(60, 140, 255, .45); }
+.pml-team .pt-emoji { font-size: 15px; }
+.pml-team .pt-name { font-weight: 900; font-size: 13.5px; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.pml-team .pt-pets { font-size: 14px; letter-spacing: 1px; }
+.pml-team .pml-stars { font-size: 11px; letter-spacing: 1px; }
+.pml-team .pt-count { font-size: 11px; font-weight: 800; opacity: .9; }
+.pml-vs {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  min-width: 52px; text-align: center;
 }
-.pml-row-rank {
-  font-weight: 900; width: 19px; height: 19px; line-height: 19px; text-align: center;
-  background: rgba(255,255,255,.16); border-radius: 50%; font-size: 11.5px; flex: none;
+.pml-vs .pml-round { font-size: 11px; font-weight: 900; letter-spacing: .6px; opacity: .95; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+.pml-vs .pml-timer {
+  font-size: 20px; font-weight: 900; color: #ffd60a;
+  text-shadow: 0 2px 0 rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.6);
 }
-.pml-row.lead .pml-row-rank { background: #ffd60a; color: #3f3000; }
-.pml-row-pet { font-size: 16px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); }
-.pml-row-name { font-weight: 800; max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
-.pml-row-bar { flex: 1; height: 8px; background: rgba(255,255,255,.22); border-radius: 99px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,.35); }
-.pml-row-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffd60a, #ff9f1c); border-radius: 99px; transition: width .3s linear; box-shadow: 0 0 6px rgba(255, 200, 0, .6); }
-.pml-row-pct { font-size: 11px; font-weight: 800; opacity: .95; width: 32px; text-align: right; }
-.pml-row-st { font-size: 13px; }
+
+/* ── Thước dây ── */
+.pml-rope-meter {
+  position: absolute; top: calc(148px + env(safe-area-inset-top)); left: 12px; right: 12px; z-index: 4;
+  pointer-events: none;
+}
+.rm-track {
+  position: relative; height: 22px; border-radius: 999px; overflow: hidden;
+  border: 2px solid rgba(255,255,255,.55); box-shadow: 0 4px 14px rgba(0,0,0,.35);
+}
+.rm-zone { position: absolute; top: 0; bottom: 0; width: 50%; }
+.rm-zone.red { left: 0; background: linear-gradient(90deg, #e03131, #ff8787); }
+.rm-zone.blue { right: 0; background: linear-gradient(90deg, #74c0fc, #1971c2); }
+.rm-center { position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: #fff; opacity: .9; }
+.rm-flag {
+  position: absolute; top: 50%; transform: translate(-50%, -50%);
+  font-size: 20px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6));
+  transition: left .25s linear;
+}
+.rm-labels {
+  display: flex; justify-content: space-between; margin-top: 3px;
+  font-size: 11px; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,.7);
+}
+.rm-comeback {
+  margin-top: 6px; text-align: center; font-size: 13.5px; font-weight: 900; color: #fff;
+  background: linear-gradient(90deg, #f59e0b, #ef4444); border-radius: 999px; padding: 6px 10px;
+  box-shadow: 0 4px 16px rgba(239, 68, 68, .5); animation: pml-join-pulse 1.2s ease-in-out infinite;
+}
+.rm-lucky {
+  margin-top: 6px; text-align: center; font-size: 12.5px; font-weight: 800; color: #3f3000;
+  background: linear-gradient(90deg, #ffd60a, #ffec99); border-radius: 999px; padding: 6px 10px;
+  box-shadow: 0 4px 14px rgba(255, 200, 0, .4);
+}
 
 .pml-floaters { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
 .pml-floater {
-  position: absolute; left: 50%; transform: translateX(-50%);
+  position: absolute;
   font-size: 21px; font-weight: 900; color: #fff; text-shadow: 0 2px 0 #d97706, 0 3px 10px rgba(0,0,0,.6);
   animation: pml-float-up 2.2s ease-out forwards; white-space: nowrap;
 }
+.pml-floater.left { left: 8%; }
+.pml-floater.right { right: 8%; }
 @keyframes pml-float-up {
-  0% { opacity: 0; transform: translate(-50%, 14px) scale(.7); }
-  15% { opacity: 1; transform: translate(-50%, 0) scale(1.12); }
-  30% { transform: translate(-50%, -4px) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, -46px) scale(1); }
+  0% { opacity: 0; transform: translateY(14px) scale(.7); }
+  15% { opacity: 1; transform: translateY(0) scale(1.12); }
+  30% { transform: translateY(-4px) scale(1); }
+  100% { opacity: 0; transform: translateY(-46px) scale(1); }
 }
 
-.pml-bigbanner {
-  position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); z-index: 7;
-  text-align: center; pointer-events: none; width: 92%;
-  animation: pml-banner 5s ease-out forwards;
+/* ── Thẻ thắng màn / vô địch ── */
+.pml-winner-card {
+  background: linear-gradient(180deg, #ffffff 0%, #fdf6e3 100%); color: #14532d; border-radius: 26px;
+  padding: 26px 18px 20px; width: 100%; max-width: 420px; text-align: center;
+  box-shadow: 0 18px 50px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.6) inset;
+  animation: pml-winner-in .4s ease-out;
 }
-.pml-bigbanner .bb-text {
-  font-size: 34px; font-weight: 900;
-  background: linear-gradient(180deg, #fff7ae, #ffd60a 55%, #ff9f1c);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #ffd60a;
-  filter: drop-shadow(0 3px 0 #b45309) drop-shadow(0 6px 18px rgba(0,0,0,.65)); letter-spacing: 1px;
+@keyframes pml-winner-in { from { opacity: 0; transform: scale(.85); } }
+.pml-winner-emoji { font-size: 56px; filter: drop-shadow(0 3px 6px rgba(0,0,0,.25)); }
+.pml-winner-title {
+  font-size: 24px; font-weight: 900; margin: 8px 0 6px;
+  background: linear-gradient(90deg, #b45309, #f59e0b);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #b45309;
 }
-.pml-bigbanner .bb-sub { font-size: 16px; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,.8); margin-top: 4px; }
-@keyframes pml-banner {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(.6); }
-  12% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
-  20% { transform: translate(-50%, -50%) scale(1); }
-  80% { opacity: 1; }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
-}
+.pml-winner-score { font-size: 22px; font-weight: 900; margin: 4px 0; }
+.pml-winner-sub { font-size: 15px; font-weight: 700; color: #4d7c5f; margin-top: 6px; }
+.pml-podium-foot { margin-top: 12px; font-size: 13px; font-weight: 700; color: #4d7c5f; }
 
 .pml-countdown {
   position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); z-index: 8;
@@ -161,29 +196,6 @@ input, select { font-family: inherit; }
 @keyframes pml-join-pulse { 50% { transform: scale(1.03); box-shadow: 0 6px 24px rgba(239, 68, 68, .55); } }
 .pml-overlay-hint { margin-top: 10px; font-size: 13px; font-weight: 600; opacity: .75; }
 
-.pml-podium-card {
-  background: linear-gradient(180deg, #ffffff 0%, #fdf6e3 100%); color: #14532d; border-radius: 26px;
-  padding: 22px 16px 18px; width: 100%; max-width: 420px;
-  box-shadow: 0 18px 50px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.6) inset;
-}
-.pml-podium-title {
-  font-size: 22px; font-weight: 900; margin-bottom: 12px;
-  background: linear-gradient(90deg, #b45309, #f59e0b);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #b45309;
-}
-.pml-podium-row { display: flex; align-items: center; gap: 9px; padding: 10px 8px; font-size: 15px; border-bottom: 1px solid rgba(20,83,45,.1); }
-.pml-podium-row:last-of-type { border-bottom: none; }
-.pml-podium-row.place1 {
-  font-weight: 900; font-size: 17px;
-  background: linear-gradient(90deg, rgba(255,214,10,.35), rgba(255,214,10,.08));
-  border-radius: 14px; border-bottom: none;
-}
-.pp-medal { font-size: 24px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.25)); }
-.pp-pet { font-size: 21px; }
-.pp-name { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pp-petname { opacity: .6; font-size: 13px; }
-.pml-podium-foot { margin-top: 12px; font-size: 13px; font-weight: 700; color: #4d7c5f; }
-
 .pml-guide {
   position: absolute; top: 60px; right: 10px; z-index: 10; width: min(86vw, 320px);
   background: linear-gradient(180deg, #ffffff, #f3fbf5); color: #14532d; border-radius: 18px; padding: 16px;
@@ -206,8 +218,8 @@ input, select { font-family: inherit; }
   animation: pml-feed-in .25s ease-out;
 }
 @keyframes pml-feed-in { from { opacity: 0; transform: translateY(6px); } }
-.pml-feed-line.chaos { background: linear-gradient(90deg, rgba(180, 83, 9, .9), rgba(220, 120, 20, .85)); font-weight: 800; border-color: rgba(255, 200, 100, .5); }
-.pml-feed-line.finish { background: linear-gradient(90deg, rgba(20, 83, 45, .9), rgba(22, 163, 74, .85)); font-weight: 800; border-color: rgba(150, 255, 180, .4); }
+.pml-feed-line.win { background: linear-gradient(90deg, rgba(180, 83, 9, .92), rgba(220, 120, 20, .88)); font-weight: 800; border-color: rgba(255, 200, 100, .5); }
+.pml-feed-line.pull { background: linear-gradient(90deg, rgba(25, 113, 194, .9), rgba(34, 139, 230, .85)); font-weight: 800; border-color: rgba(150, 210, 255, .4); }
 
 .pml-bottombar {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
@@ -262,12 +274,6 @@ input, select { font-family: inherit; }
   padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 9px; font-size: 14px; background: #fff; color: #0f172a;
 }
 .pml-admin-check { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 12px 0; }
-.pml-admin-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.pml-admin-table th, .pml-admin-table td { padding: 6px; text-align: left; }
-.pml-admin-table input, .pml-admin-table select {
-  width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: #fff; color: #0f172a;
-}
-.pml-admin-table button { border: none; background: none; font-size: 16px; color: #dc2626; }
 .pml-admin-addrow { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
 .pml-gift-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin: 12px 0; }
 .pml-gift-tile {
@@ -291,20 +297,11 @@ input, select { font-family: inherit; }
   padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 9px; font-size: 14px; background: #fff; color: #0f172a;
 }
 .pml-admin-link { border: none; background: none; color: #14532d; font-weight: 700; font-size: 13.5px; padding: 6px 0; text-decoration: underline; }
-.pml-admin-abilities { display: flex; flex-wrap: wrap; gap: 8px; }
-.pml-admin-abilities button {
-  border: 2px solid #cbd5e1; background: #fff; border-radius: 12px;
-  padding: 9px 12px; font-size: 13.5px; font-weight: 700; color: #0f172a;
-}
-.pml-admin-abilities button.active { border-color: #14532d; background: #dcfce7; }
-.pml-admin-targets { display: flex; flex-direction: column; gap: 6px; font-size: 14px; margin: 8px 0; }
-.pml-admin-targets label { display: flex; gap: 7px; align-items: center; }
 .pml-admin-diag {
   background: #0f172a; color: #a7f3d0; border-radius: 10px; padding: 12px;
   font-size: 12px; overflow-x: auto; white-space: pre-wrap;
 }
 @media (max-width: 420px) {
-  .pml-bigbanner .bb-text { font-size: 27px; }
   .pml-countdown { font-size: 76px; }
-  .pml-row-name { max-width: 26%; }
+  .pml-winner-title { font-size: 20px; }
 }

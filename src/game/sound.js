@@ -1,6 +1,6 @@
-// ─── PET MARATHON LIVE · sound.js ──────────────────────────────────────────
+// ─── KÉO CO LIVE · sound.js ────────────────────────────────────────────────
 // Âm thanh tổng hợp bằng WebAudio — không dùng file âm thanh nào.
-// Còi trượt, boing, bụp, vù, leng keng... đều vẽ bằng sóng dao động.
+// Tiếng kéo, bụp, té bùn, kèn thắng... đều vẽ bằng sóng dao động.
 
 export class SoundEngine {
   constructor() {
@@ -64,40 +64,33 @@ export class SoundEngine {
   }
 
   // ── Từng hiệu ứng ──
-  slip() { // trượt chuối: còi trượt xuống + bụp
-    this.tone({ freq: 900, freqEnd: 180, dur: 0.5, type: 'sine', vol: 0.5 })
-    this.tone({ freq: 140, freqEnd: 60, dur: 0.18, type: 'triangle', vol: 0.6, delay: 0.45 })
+  pull() { // kéo nhẹ: bụp ngắn
+    this.tone({ freq: 220, freqEnd: 140, dur: 0.12, type: 'triangle', vol: 0.45 })
+    this.noise({ dur: 0.08, vol: 0.15, lowpass: 900 })
   }
-  boing() { this.tone({ freq: 180, freqEnd: 620, dur: 0.28, type: 'sine', vol: 0.5 }) }
-  pop() { this.tone({ freq: 500, freqEnd: 900, dur: 0.08, type: 'square', vol: 0.25 }) }
-  thud() { this.tone({ freq: 110, freqEnd: 45, dur: 0.2, type: 'triangle', vol: 0.7 }); this.noise({ dur: 0.12, vol: 0.25 }) }
-  whoosh() { this.noise({ dur: 0.35, vol: 0.35, lowpass: 2500 }) }
-  sparkle() { // leng keng lên cao
-    ;[880, 1174, 1568].forEach((f, i) => this.tone({ freq: f, dur: 0.12, type: 'sine', vol: 0.3, delay: i * 0.07 }))
+  bigPull() { // kéo mạnh: gầm + bụp lớn
+    this.tone({ freq: 160, freqEnd: 320, dur: 0.25, type: 'sawtooth', vol: 0.3 })
+    this.tone({ freq: 110, freqEnd: 60, dur: 0.2, type: 'triangle', vol: 0.6, delay: 0.05 })
+    this.noise({ dur: 0.15, vol: 0.25, lowpass: 1200 })
   }
-  coin() { this.tone({ freq: 988, dur: 0.08, type: 'sine', vol: 0.35 }); this.tone({ freq: 1319, dur: 0.18, type: 'sine', vol: 0.35, delay: 0.07 }) }
-  freeze() { this.tone({ freq: 1200, freqEnd: 2400, dur: 0.4, type: 'sine', vol: 0.25 }) }
-  dizzy() { this.tone({ freq: 600, freqEnd: 300, dur: 0.5, type: 'sine', vol: 0.3 }); this.tone({ freq: 450, freqEnd: 220, dur: 0.5, type: 'sine', vol: 0.25, delay: 0.1 }) }
-  rocket() { this.noise({ dur: 0.6, vol: 0.4, lowpass: 3000 }); this.tone({ freq: 200, freqEnd: 900, dur: 0.5, type: 'sawtooth', vol: 0.2 }) }
-  shield() { this.tone({ freq: 520, dur: 0.12, type: 'sine', vol: 0.35 }); this.tone({ freq: 780, dur: 0.2, type: 'sine', vol: 0.35, delay: 0.1 }) }
-  heal() { ;[523, 659, 784, 1046].forEach((f, i) => this.tone({ freq: f, dur: 0.12, type: 'sine', vol: 0.3, delay: i * 0.06 })) }
-  fanfare() { // về đích / thắng
+  splash() { // té bùn: bõm + xì xì
+    this.tone({ freq: 300, freqEnd: 70, dur: 0.35, type: 'sine', vol: 0.55 })
+    this.noise({ dur: 0.4, vol: 0.3, lowpass: 700 })
+  }
+  cheer() { // reo hò khi thắng: kèn vui
     ;[523, 659, 784, 1046].forEach((f, i) => this.tone({ freq: f, dur: 0.22, type: 'triangle', vol: 0.4, delay: i * 0.12 }))
   }
+  fanfare() { this.cheer() }
   countdown() { this.tone({ freq: 660, dur: 0.12, type: 'square', vol: 0.3 }) }
   go() { this.tone({ freq: 880, dur: 0.3, type: 'square', vol: 0.35 }); this.tone({ freq: 1320, dur: 0.3, type: 'sine', vol: 0.3, delay: 0.05 }) }
-  chaos() { // sự kiện hỗn loạn: kèn vui
-    ;[392, 523, 659, 784].forEach((f, i) => this.tone({ freq: f, dur: 0.15, type: 'square', vol: 0.25, delay: i * 0.08 }))
+  coin() { this.tone({ freq: 988, dur: 0.08, type: 'sine', vol: 0.35 }); this.tone({ freq: 1319, dur: 0.18, type: 'sine', vol: 0.35, delay: 0.07 }) }
+  comeback() { // còi báo "cơ hội cuối"
+    this.tone({ freq: 784, dur: 0.15, type: 'square', vol: 0.3 })
+    this.tone({ freq: 1046, dur: 0.2, type: 'square', vol: 0.3, delay: 0.15 })
   }
 
-  playForAbility(abilityId) {
-    const map = {
-      banana: 'slip', melon: 'thud', net: 'pop', glove: 'boing',
-      ice: 'freeze', dizzy: 'dizzy', rocket: 'rocket', shield: 'shield',
-      heal: 'heal', magnet: 'sparkle',
-    }
-    const fn = map[abilityId]
-    if (fn && this[fn]) this[fn]()
+  playForPull(effect) {
+    if (effect >= 12) this.bigPull()
+    else this.pull()
   }
-  playForChaos() { this.chaos() }
 }

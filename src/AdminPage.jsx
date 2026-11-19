@@ -1,31 +1,37 @@
-// ─── PET MARATHON LIVE · AdminPage.jsx ─────────────────────────────────────
+// ─── KÉO CO LIVE · AdminPage.jsx ───────────────────────────────────────────
 // Trang điều khiển riêng /admin — 5 tab, điều khiển màn hiển thị từ xa qua
 // BroadcastChannel (mở 2 tab cùng trình duyệt). Không chứa logic game.
 
 import { useEffect, useRef, useState } from 'react'
 import { onSyncMessage, postCmd, postSnapshotReq } from './game/sync'
-import { ABILITIES, BALANCE_NOTE, CHAOS_EVENTS, DEFAULT_SETTINGS, giftIcon, giftPrice, giftTier } from './game/engine'
-import { fetchLeaderboard, supabaseConfigured } from './game/supabase'
+import { BALANCE_NOTE, DEFAULT_SETTINGS, TEAMS, giftIcon, giftPrice, giftTier } from './game/engine'
 
 const TABS = [
-  { id: 'race', label: '🏁 Đua' },
-  { id: 'gifts', label: '🎁 Quà & Chiêu' },
+  { id: 'tug', label: '🪢 Kéo co' },
+  { id: 'gifts', label: '🎁 Quà & Lực kéo' },
   { id: 'test', label: '🎲 Kiểm thử' },
   { id: 'connect', label: '🔗 Kết nối' },
   { id: 'settings', label: '⚙️ Cài đặt' },
 ]
+
+const PHASE_LABEL = {
+  waiting: 'Đang chờ chọn đội',
+  countdown: 'Đang đếm ngược',
+  pulling: 'Đang kéo co',
+  roundEnd: 'Vừa xong 1 màn',
+  matchEnd: 'Vừa xong 1 trận',
+}
 
 function loadWs() {
   try { return JSON.parse(localStorage.getItem('pml-ws-v1') || '{}') } catch { return {} }
 }
 
 export default function AdminPage() {
-  const [tab, setTab] = useState('race')
+  const [tab, setTab] = useState('tug')
   const [snap, setSnap] = useState(null)
   const [wsUrl, setWsUrl] = useState(() => loadWs().wsUrl || '')
   const [wsKey, setWsKey] = useState(() => loadWs().key || '')
   const [showDiag, setShowDiag] = useState(false)
-  const [leaderboard, setLeaderboard] = useState({ configured: false, rows: [] })
   const [notice, setNotice] = useState('')
   const [displayAlive, setDisplayAlive] = useState(false)
   const snapRef = useRef(null)
@@ -34,7 +40,7 @@ export default function AdminPage() {
   useEffect(() => { snapRef.current = snap }, [snap])
 
   useEffect(() => {
-    document.title = 'PET MARATHON LIVE — Bảng điều khiển'
+    document.title = 'KÉO CO LIVE — Bảng điều khiển'
     postSnapshotReq() // xin snapshot đầy đủ ngay khi mở Admin
     const off = onSyncMessage((msg) => {
       if (!msg) return
@@ -65,14 +71,12 @@ export default function AdminPage() {
     }
   }, [])
 
-  useEffect(() => {
-    if (tab === 'race') fetchLeaderboard(10).then(setLeaderboard)
-  }, [tab])
-
   const flash = (text) => { setNotice(text); setTimeout(() => setNotice(''), 3000) }
   const settings = snap?.settings || DEFAULT_SETTINGS
-  const racers = snap?.racers || []
   const connected = snap?.wsStatus === 'open'
+  const teamA = snap?.teams?.A
+  const teamB = snap?.teams?.B
+  const rope = snap?.rope ?? 0
 
   const updateSettings = (patch) => {
     postCmd({ cmd: 'settings', settings: patch })
@@ -82,7 +86,7 @@ export default function AdminPage() {
   return (
     <div className="pml-admin">
       <header className="pml-admin-head">
-        <h1>🐾 PET MARATHON LIVE <span>— Bảng điều khiển</span></h1>
+        <h1>🪢 KÉO CO LIVE <span>— Bảng điều khiển</span></h1>
         <div className="pml-admin-status">
           <span className={`pml-dot ${connected ? 'on' : ''}`} />
           {connected ? 'Đã nối live' : displayAlive ? 'Màn hiển thị đang chạy — chưa nối live' : 'Chưa thấy màn hiển thị — mở tab game (/) cùng trình duyệt này'}
@@ -96,88 +100,64 @@ export default function AdminPage() {
         ))}
       </nav>
 
-      {/* ── TAB 1: ĐUA ── */}
-      {tab === 'race' && (
+      {/* ── TAB 1: KÉO CO ── */}
+      {tab === 'tug' && (
         <section className="pml-admin-sec">
-          <h2>🏁 Cuộc đua</h2>
-          <p>Trạng thái: <b>{snap?.phase === 'waiting' ? 'Đang chờ người chơi' : snap?.phase === 'countdown' ? 'Đang đếm ngược' : snap?.phase === 'racing' ? 'Đang đua' : snap?.phase === 'finished' ? 'Đã về đích' : '—'}</b>
-            {snap?.paused ? ' · ⏸ Đang tạm dừng' : ''} · ❤️ {snap?.likes || 0} tim · 🎁 {snap?.queueLength || 0} quà đang chờ</p>
+          <h2>🪢 Trận kéo co</h2>
+          <p>Trạng thái: <b>{PHASE_LABEL[snap?.phase] || '—'}</b>
+            {snap?.paused ? ' · ⏸ Đang tạm dừng' : ''} · Màn {snap?.round || 1} · ❤️ {snap?.likes || 0} tim · 🎁 {snap?.queueLength || 0} quà đang chờ</p>
+          <p>Tỉ số màn: <b>🔴 {teamA?.roundWins || 0} — {teamB?.roundWins || 0} 🔵</b>
+            {' · '}Dây đang ở: <b>{rope > 0.05 ? 'lệch về Đỏ' : rope < -0.05 ? 'lệch về Xanh' : 'giữa'}</b>
+            {snap?.phase === 'pulling' ? ` · còn ${Math.max(0, Math.ceil(snap.roundTimeLeft || 0))} giây` : ''}</p>
           <div className="pml-admin-btns">
-            <button onClick={() => postCmd({ cmd: 'start' })}>▶️ Bắt đầu đua</button>
+            <button onClick={() => postCmd({ cmd: 'start' })}>▶️ Bắt đầu trận / màn sau</button>
             <button onClick={() => postCmd({ cmd: 'pause' })}>⏸ Tạm dừng</button>
             <button onClick={() => postCmd({ cmd: 'resume' })}>▶️ Chơi tiếp</button>
-            <button onClick={() => postCmd({ cmd: 'reset' })}>🔄 Đua lại từ đầu</button>
-            <button onClick={() => postCmd({ cmd: 'addBot' })}>🤖 Thêm thú máy</button>
-            <button onClick={() => postCmd({ cmd: 'removeBot' })}>➖ Bớt thú máy</button>
+            <button onClick={() => postCmd({ cmd: 'reset' })}>🔄 Trận mới (xóa tỉ số)</button>
           </div>
-          <h3>Thú đang đua ({racers.length}/6)</h3>
-          {racers.length === 0 && <p>Chưa có thú nào — người xem bình luận THAM GIA, hoặc bấm Bắt đầu để máy lấp đầy.</p>}
+          <h3>🔴 {TEAMS.A.name} — {TEAMS.A.pets.map((p) => ({ cat: '🐱', dog: '🐶', rabbit: '🐰' })[p]).join('')} ({teamA?.members?.length || 0} người) · tổng lực kéo {Math.round(teamA?.totalPull || 0)}</h3>
+          {(teamA?.members?.length || 0) === 0 && <p>Chưa có ai — khán giả bình luận A để vào đội Đỏ.</p>}
           <ul className="pml-admin-list">
-            {racers.map((r) => (
-              <li key={r.id}>
-                <b>Làn {r.lane + 1}</b> — {r.petName} · {r.nickname} {r.isBot ? '(máy)' : ''}
-                {' · '}{Math.round(r.dist)}m {r.finished ? `· về hạng ${r.place}` : ''}
-              </li>
+            {(teamA?.members || []).map((m) => (
+              <li key={m.nickname + m.userId}>{m.nickname} · {m.gifts || 0} quà · {Math.round(m.pulls || 0)} lực kéo</li>
             ))}
           </ul>
-          {snap?.results?.length > 0 && (
-            <>
-              <h3>Kết quả cuộc vừa rồi</h3>
-              <ol className="pml-admin-list">
-                {snap.results.map((r) => <li key={r.id}>Hạng {r.place} — {r.nickname} ({r.petName})</li>)}
-              </ol>
-            </>
-          )}
-          <h3>🏆 Bảng xếp hạng thắng nhiều nhất</h3>
-          {!supabaseConfigured() && !leaderboard.configured && (
-            <p className="pml-admin-note">Bảng xếp hạng chưa nối — game vẫn chạy bình thường, chỉ chưa lưu được thành tích lên mạng. Cần gắn địa chỉ Supabase ở phần Cài đặt thì bảng này mới hiện.</p>
-          )}
-          {leaderboard.configured && leaderboard.rows.length === 0 && (
-            <p className="pml-admin-note">Đã nối bảng xếp hạng nhưng chưa có ai thắng cuộc nào.</p>
-          )}
-          {leaderboard.rows.length > 0 && (
-            <ol className="pml-admin-list">
-              {leaderboard.rows.map((row, i) => (
-                <li key={row.winner_nickname || i}>{row.winner_nickname} — {row.wins} lần thắng · {row.total_races} cuộc đua</li>
-              ))}
-            </ol>
-          )}
+          <h3>🔵 {TEAMS.B.name} — {TEAMS.B.pets.map((p) => ({ beaver: '🦫', duck: '🦆', panda: '🐼' })[p]).join('')} ({teamB?.members?.length || 0} người) · tổng lực kéo {Math.round(teamB?.totalPull || 0)}</h3>
+          {(teamB?.members?.length || 0) === 0 && <p>Chưa có ai — khán giả bình luận B để vào đội Xanh.</p>}
+          <ul className="pml-admin-list">
+            {(teamB?.members || []).map((m) => (
+              <li key={m.nickname + m.userId}>{m.nickname} · {m.gifts || 0} quà · {Math.round(m.pulls || 0)} lực kéo</li>
+            ))}
+          </ul>
           <p className="pml-admin-note">{BALANCE_NOTE}</p>
         </section>
       )}
 
-      {/* ── TAB 2: QUÀ & CHIÊU ── */}
+      {/* ── TAB 2: QUÀ & LỰC KÉO ── */}
       {tab === 'gifts' && (
         <section className="pml-admin-sec">
-          <h2>🎁 Quà tặng → Chiêu</h2>
-          <p className="pml-admin-note">Quà thật trên TikTok, chỉ lấy quà dưới 100 xu — xu càng cao chiêu càng mạnh (1 xu = thử thách nhỏ như trượt vỏ chuối, 99 xu = thử thách cực mạnh). Chạm vào một món quà để mở bảng chi tiết của nó — giống bảng chọn quà trên TikTok. Quà nào không có trong bảng sẽ bị bỏ qua (không tự đoán).</p>
+          <h2>🎁 Quà tặng → Lực kéo</h2>
+          <p className="pml-admin-note">Quà thật trên TikTok, chỉ lấy quà dưới 100 xu — xu càng cao kéo càng mạnh (1 xu = 1 lực, 5 xu = 3, 10 xu = 6, 20 xu = 12, 99 xu = 30). Chạm vào một món quà để mở bảng chi tiết của nó — giống bảng chọn quà trên TikTok. Quà nào không có trong bảng sẽ bị bỏ qua (không tự đoán).</p>
           <GiftMapEditor giftMap={settings.giftMap || {}} onSave={(giftMap) => updateSettings({ giftMap })} onTest={(gift) => { postCmd({ cmd: 'simGift', giftName: gift, nickname: 'Bạn Thử', userId: 'test', text: '' }); flash('Đã gửi thử quà lên màn hiển thị.') }} />
-          <h3>⏱ Thời gian mỗi chiêu (giây)</h3>
-          <div className="pml-admin-grid">
-            {ABILITIES.filter((a) => a.duration > 0).map((a) => (
-              <label key={a.id} className="pml-admin-field">
-                {a.icon} {a.name}
-                <input
-                  type="number" min="0" max="30" step="0.5"
-                  defaultValue={settings.durations?.[a.id] ?? a.duration}
-                  onBlur={(e) => updateSettings({ durations: { [a.id]: Math.max(0, Number(e.target.value) || 0) } })}
-                />
-              </label>
-            ))}
-          </div>
           <h3>⚖️ Giới hạn cân bằng</h3>
           <div className="pml-admin-grid">
-            <label className="pml-admin-field">Miễn nhiễm sau khi bị đánh (giây)
-              <input type="number" min="0" max="10" defaultValue={settings.immunitySec} onBlur={(e) => updateSettings({ immunitySec: Math.max(0, Number(e.target.value) || 0) })} />
+            <label className="pml-admin-field">1 màn kéo tối đa (giây)
+              <input type="number" min="15" max="180" defaultValue={settings.roundSeconds} onBlur={(e) => updateSettings({ roundSeconds: Math.max(15, Number(e.target.value) || 45) })} />
             </label>
-            <label className="pml-admin-field">Cùng 1 thú, cách nhau ít nhất (giây) mới bị đánh lại
-              <input type="number" min="0" max="15" defaultValue={settings.attackCooldownSec} onBlur={(e) => updateSettings({ attackCooldownSec: Math.max(0, Number(e.target.value) || 0) })} />
+            <label className="pml-admin-field">Thắng bao nhiêu màn thì vô địch trận
+              <input type="number" min="1" max="7" defaultValue={settings.winsToMatch} onBlur={(e) => updateSettings({ winsToMatch: Math.max(1, Number(e.target.value) || 3) })} />
             </label>
-            <label className="pml-admin-field">Tối đa số lần bị đánh / 1 thú / 1 cuộc đua
-              <input type="number" min="1" max="10" defaultValue={settings.maxAttacksPerRacer} onBlur={(e) => updateSettings({ maxAttacksPerRacer: Math.max(1, Number(e.target.value) || 3) })} />
+            <label className="pml-admin-field">Lượt kéo toàn trận: cách nhau ít nhất (giây)
+              <input type="number" min="0" max="5" step="0.5" defaultValue={settings.globalPullIntervalSec} onBlur={(e) => updateSettings({ globalPullIntervalSec: Math.max(0, Number(e.target.value) || 0.5) })} />
             </label>
-            <label className="pml-admin-field">Chiêu toàn cuộc đua: cách nhau ít nhất (giây)
-              <input type="number" min="0" max="5" step="0.5" defaultValue={settings.globalAttackIntervalSec} onBlur={(e) => updateSettings({ globalAttackIntervalSec: Math.max(0, Number(e.target.value) || 0) })} />
+            <label className="pml-admin-field">Số tim để tiếp sức đội thua
+              <input type="number" min="10" max="1000" defaultValue={settings.likeBoostEvery} onBlur={(e) => updateSettings({ likeBoostEvery: Math.max(10, Number(e.target.value) || 100) })} />
+            </label>
+            <label className="pml-admin-field">Cơ hội cuối: đội thua quá (0–1) thì nhân đôi lực kéo
+              <input type="number" min="0.1" max="0.95" step="0.05" defaultValue={settings.comebackAt} onBlur={(e) => updateSettings({ comebackAt: Math.min(0.95, Math.max(0.1, Number(e.target.value) || 0.55)) })} />
+            </label>
+            <label className="pml-admin-field">Cơ hội cuối: nhân mấy lần lực kéo
+              <input type="number" min="1" max="5" step="0.5" defaultValue={settings.comebackMult} onBlur={(e) => updateSettings({ comebackMult: Math.max(1, Number(e.target.value) || 2) })} />
             </label>
           </div>
           <p className="pml-admin-note">{BALANCE_NOTE}</p>
@@ -188,16 +168,12 @@ export default function AdminPage() {
       {tab === 'test' && (
         <section className="pml-admin-sec">
           <h2>🎲 Kiểm thử (không cần live thật)</h2>
-          <p className="pml-admin-note">Bấm để giả lập quà / chiêu ngay trên màn hiển thị. Chỉ dùng để thử — không phải quà thật từ khán giả.</p>
-          <TestPanel racers={racers} phase={snap?.phase} onDone={() => flash('Đã gửi thử lên màn hiển thị.')} />
-          <h3>🎲 Sự kiện hỗn loạn</h3>
-          <div className="pml-admin-btns">
-            {CHAOS_EVENTS.map((e) => (
-              <button key={e.id} onClick={() => { postCmd({ cmd: 'chaos', eventId: e.id }); flash(`Đã kích hoạt: ${e.name}`) }}>{e.icon} {e.name}</button>
-            ))}
-          </div>
+          <p className="pml-admin-note">Bấm để giả lập kéo / quà ngay trên màn hiển thị. Chỉ dùng để thử — không phải quà thật từ khán giả.</p>
+          <TestPanel phase={snap?.phase} giftMap={settings.giftMap || {}} onDone={() => flash('Đã gửi thử lên màn hiển thị.')} />
           <h3>💬 Giả bình luận / tim</h3>
           <div className="pml-admin-btns">
+            <button onClick={() => postCmd({ cmd: 'simChat', nickname: 'Bạn Thử', userId: 'test1', text: 'A' })}>💬 Giả: A (vào Đội Đỏ)</button>
+            <button onClick={() => postCmd({ cmd: 'simChat', nickname: 'Bạn Thử 2', userId: 'test2', text: 'B' })}>💬 Giả: B (vào Đội Xanh)</button>
             <button onClick={() => postCmd({ cmd: 'simChat', nickname: 'Bạn Thử', userId: 'test1', text: 'THAM GIA' })}>💬 Giả: THAM GIA</button>
             <button onClick={() => postCmd({ cmd: 'simLike', count: 100 })}>❤️ Giả: +100 tim</button>
             <button onClick={() => postCmd({ cmd: 'simLike', count: 10 })}>🤍 Giả: +10 tim</button>
@@ -232,7 +208,8 @@ export default function AdminPage() {
           {showDiag && (
             <pre className="pml-admin-diag">{JSON.stringify({
               trangThai: snap?.wsStatus, chiTiet: snap?.wsDetail,
-              soThu: racers.length, giaiDoan: snap?.phase,
+              giaiDoan: snap?.phase, man: snap?.round,
+              day: snap?.rope, tiSo: `${teamA?.roundWins || 0}-${teamB?.roundWins || 0}`,
               hangDoiQua: snap?.queueLength, thongKe: snap?.stats,
             }, null, 2)}</pre>
           )}
@@ -244,18 +221,6 @@ export default function AdminPage() {
         <section className="pml-admin-sec">
           <h2>⚙️ Cài đặt</h2>
           <div className="pml-admin-grid">
-            <label className="pml-admin-field">Độ dài đường đua (mét)
-              <input type="number" min="50" max="1000" defaultValue={settings.raceDistance} onBlur={(e) => updateSettings({ raceDistance: Math.max(50, Number(e.target.value) || 400) })} />
-            </label>
-            <label className="pml-admin-field">Sự kiện hỗn loạn: nhanh nhất (giây)
-              <input type="number" min="10" max="300" defaultValue={settings.chaosMinSec} onBlur={(e) => updateSettings({ chaosMinSec: Math.max(10, Number(e.target.value) || 40) })} />
-            </label>
-            <label className="pml-admin-field">Sự kiện hỗn loạn: chậm nhất (giây)
-              <input type="number" min="10" max="300" defaultValue={settings.chaosMaxSec} onBlur={(e) => updateSettings({ chaosMaxSec: Math.max(10, Number(e.target.value) || 60) })} />
-            </label>
-            <label className="pml-admin-field">Số tim để tăng tốc 1 thú ngẫu nhiên
-              <input type="number" min="10" max="1000" defaultValue={settings.likeBoostEvery} onBlur={(e) => updateSettings({ likeBoostEvery: Math.max(10, Number(e.target.value) || 100) })} />
-            </label>
             <label className="pml-admin-field">ID TikTok của streamer (để dùng lệnh DỪNG / TIẾP / +30S)
               <input type="text" defaultValue={settings.streamerId || ''} placeholder="vd: ten_tiktok_cua_ban" onBlur={(e) => updateSettings({ streamerId: e.target.value.trim() })} />
             </label>
@@ -265,8 +230,7 @@ export default function AdminPage() {
             {' '}Bật âm thanh vui (tổng hợp, không cần file nhạc)
           </label>
           <p className="pml-admin-note">
-            API lưu kết quả:{' '}{import.meta.env?.VITE_API_URL ? 'đã gắn địa chỉ.' : 'chưa gắn — kết quả đua chỉ hiện trên màn hình, không lưu lên mạng.'}
-            {' '}Bảng xếp hạng:{' '}{supabaseConfigured() ? 'đã nối.' : 'chưa nối — cần gắn địa chỉ Supabase thì mới hiện.'}
+            API lưu kết quả:{' '}{import.meta.env?.VITE_API_URL ? 'đã gắn địa chỉ.' : 'chưa gắn — kết quả trận chỉ hiện trên màn hình, không lưu lên mạng.'}
           </p>
           <p className="pml-admin-note">Mẹo trình chiếu: mở màn hiển thị với <code>?present=1</code> để ẩn nút hướng dẫn (vd: /?present=1).</p>
         </section>
@@ -276,27 +240,27 @@ export default function AdminPage() {
 }
 
 // ─── Bảng chọn quà kiểu TikTok ───
-// Lưới quà: mỗi món hiện đúng icon quà TikTok + tên + chiêu. Chạm vào 1 món
-// quà sẽ mở bảng chi tiết của món đó (icon lớn, tên, chiêu, thử tặng, xóa).
+// Lưới quà: mỗi món hiện đúng icon quà TikTok + tên + lực kéo. Chạm vào 1 món
+// quà sẽ mở bảng chi tiết của món đó (icon lớn, tên, lực kéo, thử tặng, xóa).
 function GiftMapEditor({ giftMap, onSave, onTest }) {
   const [selected, setSelected] = useState(null)
   const [newGift, setNewGift] = useState('')
-  const [newAbility, setNewAbility] = useState('banana')
+  const [newPower, setNewPower] = useState(1)
   const entries = Object.entries(giftMap)
-  const sel = selected != null && giftMap[selected] ? selected : null
-  const selAbility = sel ? ABILITIES.find((a) => a.id === giftMap[sel]) : null
+  const sel = selected != null && giftMap[selected] != null ? selected : null
+  const selPower = sel ? giftMap[sel] : null
 
   const rename = (oldName, newName) => {
     const name = String(newName || '').trim().toLowerCase()
     if (!name || name === oldName) return
     const next = { ...giftMap }
-    const ability = next[oldName]
+    const power = next[oldName]
     delete next[oldName]
-    next[name] = ability
+    next[name] = power
     onSave(next)
     setSelected(name)
   }
-  const setAbility = (gift, ability) => onSave({ ...giftMap, [gift]: ability })
+  const setPower = (gift, power) => onSave({ ...giftMap, [gift]: Math.max(0, Number(power) || 0) })
   const removeGift = (gift) => {
     const next = { ...giftMap }
     delete next[gift]
@@ -306,7 +270,7 @@ function GiftMapEditor({ giftMap, onSave, onTest }) {
   const addGift = () => {
     const name = newGift.trim().toLowerCase()
     if (!name) return
-    onSave({ ...giftMap, [name]: newAbility })
+    onSave({ ...giftMap, [name]: Math.max(0, Number(newPower) || 0) })
     setNewGift('')
     setSelected(name)
   }
@@ -314,38 +278,35 @@ function GiftMapEditor({ giftMap, onSave, onTest }) {
   return (
     <div>
       <div className="pml-gift-grid">
-        {entries.map(([gift, ability]) => {
-          const a = ABILITIES.find((x) => x.id === ability)
+        {entries.map(([gift, power]) => {
           const price = giftPrice(gift)
           return (
             <button key={gift} className={`pml-gift-tile ${sel === gift ? 'active' : ''}`} onClick={() => setSelected(sel === gift ? null : gift)}>
               <span className="gi">{giftIcon(gift)}</span>
               <span className="gn">{gift}</span>
               {price != null && <span className="gp">🪙 {price} xu</span>}
-              <span className="ga">{a ? `${a.icon} ${a.name}` : ''}</span>
+              <span className="ga">💪 {power} lực kéo</span>
             </button>
           )
         })}
       </div>
-      {sel && selAbility && (
+      {sel && selPower != null && (
         <div className="pml-gift-sheet">
           <div className="gs-top">
             <span className="gs-icon">{giftIcon(sel)}</span>
             <div>
               <div className="gs-name">{sel}</div>
-              <div className="gs-ability">{selAbility.icon} {selAbility.name}</div>
+              <div className="gs-ability">💪 {selPower} lực kéo</div>
               {giftPrice(sel) != null && <div className="gs-price">🪙 {giftPrice(sel)} xu — {giftTier(giftPrice(sel))}</div>}
             </div>
             <button className="gs-x" onClick={() => setSelected(null)}>✕</button>
           </div>
-          <p className="gs-desc">{selAbility.desc}</p>
+          <p className="gs-desc">Tặng quà này là kéo dây {selPower} lực về phía đội của người tặng. Quà càng nhiều xu thì lực kéo càng lớn.</p>
           <label className="pml-admin-field">Tên quà
             <input key={sel} defaultValue={sel} onBlur={(e) => rename(sel, e.target.value)} />
           </label>
-          <label className="pml-admin-field">Chiêu khi tặng quà này
-            <select value={giftMap[sel]} onChange={(e) => setAbility(sel, e.target.value)}>
-              {ABILITIES.map((a) => <option key={a.id} value={a.id}>{a.icon} {a.name}</option>)}
-            </select>
+          <label className="pml-admin-field">Lực kéo khi tặng quà này
+            <input type="number" min="0" max="100" key={`p-${sel}`} defaultValue={selPower} onBlur={(e) => setPower(sel, e.target.value)} />
           </label>
           <div className="pml-admin-btns">
             <button onClick={() => onTest(sel)}>🎁 Thử tặng quà này</button>
@@ -356,9 +317,7 @@ function GiftMapEditor({ giftMap, onSave, onTest }) {
       <div className="pml-admin-addrow">
         <span style={{ fontSize: 26, alignSelf: 'center' }}>{giftIcon(newGift)}</span>
         <input value={newGift} onChange={(e) => setNewGift(e.target.value)} placeholder="Tên quà mới, vd: Bánh" />
-        <select value={newAbility} onChange={(e) => setNewAbility(e.target.value)}>
-          {ABILITIES.map((a) => <option key={a.id} value={a.id}>{a.icon} {a.name}</option>)}
-        </select>
+        <input type="number" min="0" max="100" value={newPower} onChange={(e) => setNewPower(e.target.value)} placeholder="Lực kéo" style={{ maxWidth: 90 }} />
         <button onClick={addGift}>➕ Thêm</button>
       </div>
       <button className="pml-admin-link" onClick={() => { onSave({ ...DEFAULT_SETTINGS.giftMap }); setSelected(null) }}>
@@ -368,43 +327,37 @@ function GiftMapEditor({ giftMap, onSave, onTest }) {
   )
 }
 
-// ─── Panel kiểm thử chiêu ───
-function TestPanel({ racers, phase, onDone }) {
-  const [ability, setAbility] = useState('banana')
-  const [targetId, setTargetId] = useState('')
+// ─── Panel kiểm thử kéo ───
+const POWER_CHOICES = [1, 3, 6, 12, 30]
+function TestPanel({ phase, giftMap, onDone }) {
+  const [teamId, setTeamId] = useState('A')
+  const [power, setPower] = useState(6)
   const [sender, setSender] = useState('Bạn Thử')
-  const racing = phase === 'racing'
+  const pulling = phase === 'pulling'
   return (
     <div>
-      {!racing && <p className="pml-admin-note">Chiêu chỉ có tác dụng khi đang đua — bấm “Bắt đầu đua” ở tab Đua trước.</p>}
-      <div className="pml-admin-abilities">
-        {ABILITIES.map((a) => (
-          <button key={a.id} className={ability === a.id ? 'active' : ''} onClick={() => setAbility(a.id)} title={a.desc}>
-            {a.icon} {a.name}
-          </button>
-        ))}
+      {!pulling && <p className="pml-admin-note">Lực kéo chỉ có tác dụng khi đang kéo co — bấm “Bắt đầu trận / màn sau” ở tab Kéo co trước.</p>}
+      <h4>🪢 Chọn đội kéo</h4>
+      <div className="pml-admin-btns">
+        <button className={teamId === 'A' ? 'active' : ''} onClick={() => setTeamId('A')}>🔴 Đội Đỏ</button>
+        <button className={teamId === 'B' ? 'active' : ''} onClick={() => setTeamId('B')}>🔵 Đội Xanh</button>
       </div>
-      <p className="pml-admin-note">{ABILITIES.find((a) => a.id === ability)?.desc}</p>
-      <h4>🎯 Chọn mục tiêu {ABILITIES.find((a) => a.id === ability)?.kind === 'buff' ? '(chiêu tăng sức luôn vào thú của người gửi)' : '(để trống = chọn đối thủ ngẫu nhiên)'}</h4>
-      <div className="pml-admin-targets">
-        <label><input type="radio" name="tgt" checked={targetId === ''} onChange={() => setTargetId('')} /> Ngẫu nhiên</label>
-        {racers.map((r) => (
-          <label key={r.id}>
-            <input type="radio" name="tgt" checked={targetId === r.id} onChange={() => setTargetId(r.id)} />
-            Làn {r.lane + 1} — {r.petName} ({r.nickname})
-          </label>
+      <h4>💪 Lực kéo</h4>
+      <div className="pml-admin-btns">
+        {POWER_CHOICES.map((p) => (
+          <button key={p} className={power === p ? 'active' : ''} onClick={() => setPower(p)}>{p} lực</button>
         ))}
       </div>
       <label className="pml-admin-field">Người gửi (tên hiển thị)
         <input value={sender} onChange={(e) => setSender(e.target.value)} />
       </label>
       <div className="pml-admin-btns">
-        <button disabled={!racing} onClick={() => { postCmd({ cmd: 'inject', abilityId: ability, sender, targetId: targetId || null }); onDone() }}>
-          💥 Thử chiêu này
+        <button disabled={!pulling} onClick={() => { postCmd({ cmd: 'inject', teamId, power, sender }); onDone() }}>
+          💪 Thử kéo {power} lực cho {teamId === 'A' ? 'Đội Đỏ' : 'Đội Xanh'}
         </button>
-        <button disabled={!racing} onClick={() => {
-          const giftName = Object.entries(DEFAULT_SETTINGS.giftMap).find(([, v]) => v === ability)?.[0] || 'Hoa hồng'
-          postCmd({ cmd: 'simGift', giftName, nickname: sender, userId: 'test', text: targetId ? `@${racers.find((r) => r.id === targetId)?.nickname || ''}` : '' })
+        <button disabled={!pulling} onClick={() => {
+          const giftName = Object.entries(giftMap).find(([, v]) => v === power)?.[0] || 'Hoa hồng'
+          postCmd({ cmd: 'simGift', giftName, nickname: sender, userId: 'test', text: teamId })
           onDone()
         }}>
           🎁 Thử qua đường quà (kèm chống trùng + xếp hàng)

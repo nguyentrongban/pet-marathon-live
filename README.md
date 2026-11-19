@@ -1,20 +1,21 @@
-# 🐾 PET MARATHON LIVE
+# 🪢 KÉO CO LIVE
 
-Game đua thú cưng tương tác trên TikTok LIVE — **hệ thống quà tặng hỗn loạn (Chaotic Gift Battle)**.
-Khán giả bình luận **THAM GIA** để nhận 1 thú đua, tặng quà để ném chuối 🍌, lăn dưa hấu 🍉,
-quăng lưới 🕸️, đấm bay 🥊, đóng băng 🧊, bom chóng mặt 💫… hoặc buff thú của mình bằng
-tên lửa 🚀, khiên 🛡️, thuốc 🧪, nam châm 🧲.
+Game kéo co 2 đội tương tác trên TikTok LIVE — **đội nào kéo dây qua vạch thì thắng màn**.
+Khán giả bình luận **A** (Đội Đỏ 🔴) hoặc **B** (Đội Xanh 🔵) để chọn đội, tặng quà để kéo
+dây về phía đội mình (hoa hồng 1 xu kéo nhẹ, hạc giấy 99 xu kéo cực mạnh), thả tim đủ 100
+thì tiếp sức cho đội đang thua. Đội thua quá nửa đường được nhân đôi lực kéo (cơ hội cuối)
+nên màn nào cũng có thể lật kèo. Thắng 3 màn trước thì vô địch trận.
 
 ## Stack thực tế đã dùng
 
 | Phần | Công nghệ |
 |---|---|
-| Game (web) | React 19 + Vite + **Three.js** (đường đua 3D, thú chibi low-poly dựng từ hình khối, không model ngoài, không ảnh ngoài) |
+| Game (web) | React 19 + Vite + **Three.js** (sân kéo co 3D, hố bùn, thú khối vuông Kenney Cube Pets, không ảnh ngoài) |
 | Âm thanh | WebAudio tổng hợp (còi trượt, boing, leng keng…) — không file nhạc |
-| Backend API | Node tối giản (`server/`, không thư viện ngoài) — `GET /health`, `POST /race-result`, `GET /leaderboard` |
+| Backend API | Node tối giản (`server/`, không thư viện ngoài) — `GET /health`, `POST /match-result`, `GET /leaderboard` |
 | TikTok LIVE | Connector Node.js hiện tại (repo riêng, theo mẫu `tick-tock-connector`), game nối qua WebSocket `wss://<app>.onrender.com/ws?key=` — **không dựng lại connector** |
 | Realtime | WebSocket + BroadcastChannel (màn hiển thị ↔ Admin, 2 tab cùng trình duyệt) |
-| Database | **Supabase** qua env — `supabase/migrations/001_pet_marathon.sql` (bảng `race_results`, `gift_log`, view `leaderboard`) |
+| Database | Chưa dùng — kết quả trận chỉ lưu tạm trong bộ nhớ API khi chưa nối Supabase |
 | Redis | Không cần |
 | Ảnh | Không cần — vẽ bằng code; Cloudinary chỉ khi thật sự cần (chưa dùng) |
 | Deploy | **Tất cả trên Render** (không dùng Vercel): Static Site cho game + Web Service cho API, khai báo đủ trong `render.yaml` |
@@ -25,7 +26,7 @@ tên lửa 🚀, khiên 🛡️, thuốc 🧪, nam châm 🧲.
 npm install
 npm run dev        # game ở http://localhost:5174  (màn hiển thị /)
                    # Admin ở http://localhost:5174/admin (mở tab riêng)
-npm test           # test logic hệ chiêu: node tests/battle.test.js
+npm test           # test logic kéo co: node tests/tug.test.js
 npm run build      # build ra dist/
 ```
 

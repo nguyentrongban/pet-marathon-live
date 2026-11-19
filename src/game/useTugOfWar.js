@@ -1,0 +1,431 @@
+// ─── KÉO CO LIVE · useTugOfWar.js ──────────────────────────────────────────
+// Hook chủ của màn hiển thị: giữ state engine, vòng lặp kéo co, nối TikTok WS,
+// nhận lệnh từ Admin qua BroadcastChannel, phát snapshot về Admin mỗi 500ms.
+// Không bao giờ tự bịa event quà: chỉ event thật từ WS hoặc Admin bấm thử.
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  DEFAULT_SETTINGS, GiftEngine, TEAMS, advance, applyLikeBoost, applyPull,
+  createMatch, giftIcon, joinTeam, migrateGiftMap, startMatch, startRound,
+} from './engine'
+import { createSeqTracker, normalizeEvent, parseCommand } from './adapter'
+import { TikTokWS, WS_STATUS } from './wsClient'
+import { SoundEngine } from './sound'
+import { onSyncMessage, postHeartbeat, postHello, postState } from './sync'
+
+const SETTINGS_KEY = 'pml-settings-v1'
+const WS_KEY = 'pml-ws-v1'
+
+export function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY)
+    if (!raw) return { ...DEFAULT_SETTINGS, giftMap: { ...DEFAULT_SETTINGS.giftMap } }
+    const saved = JSON.parse(raw)
+    return {
+      ...DEFAULT_SETTINGS,
+      ...saved,
+      giftMap: migrateGiftMap({ ...DEFAULT_SETTINGS.giftMap, ...(saved.giftMap || {}) }),
+    }
+  } catch { return { ...DEFAULT_SETTINGS, giftMap: { ...DEFAULT_SETTINGS.giftMap } } }
+}
+
+function saveSettings(s) {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)) } catch { /* ignore */ }
+}
+
+function loadWs() {
+  try { return JSON.parse(localStorage.getItem(WS_KEY) || '{}') } catch { return {} }
+}
+
+export function useTugOfWar() {
+  const stateRef = useRef(null)
+  if (!stateRef.current) {
+    const settings = loadSettings()
+    const st = createMatch(settings)
+    st.paused = false
+    st.pendingJoins = []
+    stateRef.current = st
+  }
+  const engineRef = useRef(null)
+  if (!engineRef.current) engineRef.current = new GiftEngine(stateRef.current)
+  const soundRef = useRef(null)
+  if (!soundRef.current) soundRef.current = new SoundEngine()
+  const wsRef = useRef(null)
+  const pendingJoinsRef = useRef([])
+  // Bắt kịp sau khi rớt mạng: seq cao nhất đã nhận + các seq đã áp dụng
+  // (để bỏ qua event trùng khi connector gửi lại).
+  const lastSeqRef = useRef(0)
+  const seqTrackerRef = useRef(null)
+  if (!seqTrackerRef.current) seqTrackerRef.current = createSeqTracker()
+
+  const [snap, setSnap] = useState(null)
+  const [wsStatus, setWsStatus] = useState(WS_STATUS.IDLE)
+  const [wsDetail, setWsDetail] = useState('')
+  const [wsLog, setWsLog] = useState([])
+  const [muted, setMuted] = useState(() => !loadSettings().soundOn)
+  const prevCountRef = useRef(null)
+  const prevPhaseRef = useRef(null)
+  const prevRoundWinnerRef = useRef(null)
+  const reportedMatchRef = useRef('')
+
+  const logWs = useCallback((line) => {
+    setWsLog((prev) => [{ at: new Date().toLocaleTimeString('vi-VN'), line }, ...prev].slice(0, 40))
+  }, [])
+
+  // ── Gửi kết quả trận về API (nếu có cấu hình) — không có thì bỏ qua lặng lẽ ──
+  const reportMatch = useCallback((state) => {
+    const api = import.meta.env?.VITE_API_URL || ''
+    if (!api || reportedMatchRef.current === state.matchId || !state.matchWinner) return
+    reportedMatchRef.current = state.matchId
+    try {
+      fetch(`${api.replace(/\/$/, '')}/match-result`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          matchId: state.matchId,
+          winnerTeam: state.matchWinner,
+          score: { A: state.teams.A.roundWins, B: state.teams.B.roundWins },
+          gifts: state.stats.gifts,
+        }),
+      }).catch(() => {})
+    } catch { /* chạy local thì thôi */ }
+  }, [])
+
+  // ── Chụp nhanh state cho React UI + Admin ──
+  const takeSnap = useCallback(() => {
+    const s = stateRef.current
+    if (!s) return
+    setSnap({
+      v: Date.now(),
+      phase: s.phase, paused: !!s.paused, countdown: Math.max(0, s.countdown),
+      roundTimeLeft: s.roundTimeLeft, matchId: s.matchId, round: s.round,
+      now: s.now, nextRoundIn: s.nextRoundIn, matchEndIn: s.matchEndIn,
+      rope: s.rope,
+      teams: {
+        A: { ...s.teams.A, members: s.teams.A.members.slice(0, 20) },
+        B: { ...s.teams.B, members: s.teams.B.members.slice(0, 20) },
+      },
+      teamCounts: { A: s.teams.A.members.length, B: s.teams.B.members.length },
+      roundWinner: s.roundWinner, matchWinner: s.matchWinner,
+      luckyStar: s.luckyStar,
+      feed: s.feed.slice(-8),
+      floaters: [...s.floaters],
+      effects: [...s.effects],
+      stats: { ...s.stats },
+      likes: s.likes,
+      queueLength: engineRef.current.queueLength,
+      settings: s.settings,
+      pendingJoins: pendingJoinsRef.current.length,
+    })
+  }, [])
+
+  // ── Gửi snapshot đầy đủ về Admin (định kỳ + khi Admin xin) ──
+  const broadcastState = useCallback(() => {
+    const s = stateRef.current
+    if (!s) return
+    postState({
+      phase: s.phase, paused: !!s.paused, countdown: s.countdown,
+      roundTimeLeft: s.roundTimeLeft, matchId: s.matchId, round: s.round,
+      rope: s.rope,
+      teams: {
+        A: { roundWins: s.teams.A.roundWins, totalPull: s.teams.A.totalPull, members: s.teams.A.members.map((m) => ({ nickname: m.nickname, pulls: m.pulls, gifts: m.gifts })) },
+        B: { roundWins: s.teams.B.roundWins, totalPull: s.teams.B.totalPull, members: s.teams.B.members.map((m) => ({ nickname: m.nickname, pulls: m.pulls, gifts: m.gifts })) },
+      },
+      roundWinner: s.roundWinner, matchWinner: s.matchWinner,
+      feed: s.feed.slice(-8), stats: s.stats, likes: s.likes,
+      queueLength: engineRef.current.queueLength,
+      settings: s.settings, wsStatus, wsDetail,
+      wsLog: wsLog.slice(0, 30),
+    })
+  }, [wsStatus, wsDetail, wsLog])
+
+  // ── Chào Admin ngay khi tải + gửi snapshot đầu tiên ──
+  useEffect(() => {
+    postHello()
+    broadcastState()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleEvent = useCallback((ev) => {
+    const s = stateRef.current
+    if (!s || !ev) return
+    if (ev.kind === 'system') return
+    if (ev.kind === 'unknown') { logWs(`Event lạ bỏ qua: ${ev.reason || ''}`); return }
+    const sound = soundRef.current
+
+    if (ev.kind === 'chat') {
+      const cmd = parseCommand(ev.comment)
+      const streamerId = (s.settings.streamerId || '').trim().toLowerCase()
+      const isStreamer = streamerId && (ev.userId.toLowerCase() === streamerId || ev.nickname.toLowerCase() === streamerId)
+      if (cmd?.cmd === 'join' || cmd?.cmd === 'joinTeam') {
+        const teamId = cmd.cmd === 'joinTeam' ? cmd.teamId : 'balance'
+        const r = joinTeam(s, teamId, ev.nickname, ev.userId)
+        if (!r.ok && r.reason === 'full') {
+          pendingJoinsRef.current.push({ nickname: ev.nickname, userId: ev.userId, teamId })
+        }
+        takeSnap()
+        return
+      }
+      if (cmd?.cmd === 'start' && (s.phase === 'waiting' || s.phase === 'roundEnd' || s.phase === 'matchEnd')) { doStart(); return }
+      if (cmd?.cmd === 'pause' && isStreamer) { s.paused = true; takeSnap(); return }
+      if (cmd?.cmd === 'resume' && isStreamer) { s.paused = false; takeSnap(); return }
+      if (cmd?.cmd === 'addTime' && isStreamer) {
+        if (s.phase === 'pulling' || s.phase === 'countdown') {
+          s.roundTimeLeft += cmd.seconds
+          s.feed.push({ id: `f${Date.now()}`, kind: 'info', text: `⚡ Streamer cộng thêm ${cmd.seconds} giây kéo co!`, at: s.now })
+          sound.go()
+        }
+        takeSnap()
+        return
+      }
+      // Bình luận thường: chỉ hiện trong log, không làm gì khác
+      logWs(`💬 ${ev.nickname}: ${ev.comment}`)
+      return
+    }
+
+    if (ev.kind === 'gift') {
+      const res = engineRef.current.receive({
+        id: ev.id || `${ev.userId}:${ev.giftName}:${Date.now()}`,
+        giftName: ev.giftName, nickname: ev.nickname, userId: ev.userId, text: ev.text || '',
+      })
+      if (res.ok) logWs(`${giftIcon(ev.giftName)} ${ev.nickname} tặng ${ev.giftName} → kéo ${TEAMS[res.teamId].name} (${res.power} lực)`)
+      else if (res.reason === 'unmapped') logWs(`${giftIcon(ev.giftName)} ${ev.nickname} tặng ${ev.giftName} (chưa gán lực kéo — xem tab Quà & Lực kéo)`)
+      else if (res.reason !== 'duplicate') logWs(`${giftIcon(ev.giftName)} ${ev.nickname} tặng ${ev.giftName}: ${res.reason}`)
+      takeSnap()
+      return
+    }
+
+    if (ev.kind === 'like') {
+      const boosted = applyLikeBoost(s, ev.likeCount)
+      if (boosted > 0) sound.comeback()
+      takeSnap()
+      return
+    }
+
+    if (ev.kind === 'join') {
+      s.feed.push({ id: `f${Date.now()}`, kind: 'join', text: `👋 ${ev.nickname} vừa vào xem live!`, at: s.now })
+      takeSnap()
+      return
+    }
+    if (ev.kind === 'follow') {
+      s.feed.push({ id: `f${Date.now()}`, kind: 'join', text: `💖 ${ev.nickname} vừa theo dõi!`, at: s.now })
+      takeSnap()
+      return
+    }
+    if (ev.kind === 'share') {
+      s.feed.push({ id: `f${Date.now()}`, kind: 'join', text: `🔁 ${ev.nickname} vừa chia sẻ live!`, at: s.now })
+      takeSnap()
+      return
+    }
+  }, [logWs, takeSnap])
+
+  // ── Bắt đầu trận / màn ──
+  const doStart = useCallback(() => {
+    const s = stateRef.current
+    if (s.phase === 'roundEnd') {
+      s.round++
+      startRound(s)
+    } else if (s.phase === 'waiting' || s.phase === 'matchEnd') {
+      for (const p of pendingJoinsRef.current.splice(0)) {
+        joinTeam(s, p.teamId || 'balance', p.nickname, p.userId)
+      }
+      startMatch(s)
+    }
+    takeSnap()
+  }, [takeSnap])
+
+  // ── Lệnh từ Admin ──
+  useEffect(() => {
+    const off = onSyncMessage((msg) => {
+      if (!msg || msg.type !== 'cmd') return
+      const s = stateRef.current
+      const sound = soundRef.current
+      if (msg.cmd === 'start') doStart()
+      else if (msg.cmd === 'snapshotReq') broadcastState()
+      else if (msg.cmd === 'pause') { s.paused = true; takeSnap() }
+      else if (msg.cmd === 'resume') { s.paused = false; takeSnap() }
+      else if (msg.cmd === 'reset') {
+        const settings = s.settings
+        const fresh = createMatch(settings)
+        fresh.paused = false
+        fresh.pendingJoins = []
+        stateRef.current = fresh
+        engineRef.current = new GiftEngine(fresh)
+        pendingJoinsRef.current = []
+        reportedMatchRef.current = ''
+        takeSnap()
+      } else if (msg.cmd === 'inject') {
+        if (s.phase === 'pulling') {
+          const res = applyPull(s, msg.teamId, msg.power || 6, { nickname: msg.sender || 'Admin thử', userId: 'admin' })
+          if (res.ok) sound.playForPull(res.effect)
+        }
+        takeSnap()
+      } else if (msg.cmd === 'settings') {
+        Object.assign(s.settings, msg.settings || {})
+        if (msg.settings?.giftMap) s.settings.giftMap = migrateGiftMap(msg.settings.giftMap)
+        sound.enabled = s.settings.soundOn !== false
+        saveSettings(s.settings)
+        takeSnap()
+      } else if (msg.cmd === 'connect') {
+        try { localStorage.setItem(WS_KEY, JSON.stringify({ wsUrl: msg.wsUrl, key: msg.key })) } catch { /* ignore */ }
+        wsRef.current?.connect(msg.wsUrl, msg.key)
+      } else if (msg.cmd === 'disconnect') {
+        wsRef.current?.disconnect()
+      } else if (msg.cmd === 'simChat') {
+        handleEvent({ kind: 'chat', nickname: msg.nickname || 'Khán giả thử', userId: msg.userId || 'test', comment: msg.text || '' })
+      } else if (msg.cmd === 'simGift') {
+        engineRef.current.receive({
+          id: `sim-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          giftName: msg.giftName, nickname: msg.nickname || 'Khán giả thử', userId: msg.userId || 'test',
+          text: msg.text || '',
+        })
+        takeSnap()
+      } else if (msg.cmd === 'simLike') {
+        handleEvent({ kind: 'like', nickname: 'Khán giả thử', userId: 'test', likeCount: msg.count || 10 })
+      } else if (msg.cmd === 'toggleSound') {
+        s.settings.soundOn = !s.settings.soundOn
+        sound.enabled = s.settings.soundOn
+        saveSettings(s.settings)
+        setMuted(!s.settings.soundOn)
+        takeSnap()
+      }
+    })
+    return off
+  }, [doStart, handleEvent, takeSnap, broadcastState])
+
+  // ── Vòng lặp chính: setInterval + thời gian thực ──────────────────────────
+  // KHÔNG dùng requestAnimationFrame: trình duyệt bóp rAF khi tab ở nền làm
+  // trận đóng băng và Admin mất đồng bộ. advance() chia dt thành bước ≤0,1s
+  // nên dù timer nền chỉ chạy 1 lần/giây, trận vẫn tiến đúng giờ thực.
+  useEffect(() => {
+    let lastTick = performance.now()
+    let lastSnap = 0
+    let lastBroadcast = 0
+    let lastHeartbeat = 0
+    const step = () => {
+      const nowMs = performance.now()
+      const dt = Math.min(5, Math.max(0, (nowMs - lastTick) / 1000))
+      lastTick = nowMs
+      const s = stateRef.current
+      if (!s) return
+      if (!s.paused) {
+        advance(s, dt)
+        // Xử lý hàng đợi quà theo giới hạn toàn cục
+        const done = engineRef.current.process(s.now)
+        if (done?.ok) soundRef.current.playForPull(done.effect || 0)
+        // Âm thanh đếm ngược / bắt đầu kéo
+        const c = Math.ceil(s.countdown)
+        if (s.phase === 'countdown' && c !== prevCountRef.current) {
+          prevCountRef.current = c
+          if (c > 0) soundRef.current.countdown()
+        }
+        if (s.phase === 'pulling' && prevPhaseRef.current !== 'pulling') soundRef.current.go()
+        // Thắng màn / thắng trận: kèn + té bùn
+        if (s.roundWinner && s.roundWinner !== prevRoundWinnerRef.current) {
+          prevRoundWinnerRef.current = s.roundWinner
+          soundRef.current.cheer()
+          soundRef.current.splash()
+        }
+        if (s.phase === 'matchEnd') reportMatch(s)
+        if (!s.roundWinner) prevRoundWinnerRef.current = null
+        prevPhaseRef.current = s.phase
+      }
+      if (nowMs - lastSnap > 200) { lastSnap = nowMs; takeSnap() }
+      if (nowMs - lastBroadcast > 500) { lastBroadcast = nowMs; broadcastState() }
+      if (nowMs - lastHeartbeat > 2000) {
+        lastHeartbeat = nowMs
+        postHeartbeat({ phase: s.phase, round: s.round, matchId: s.matchId })
+      }
+    }
+    const id = setInterval(step, 100)
+    return () => clearInterval(id)
+  }, [reportMatch, takeSnap, broadcastState])
+
+  // ── Nối TikTok WS ──
+  useEffect(() => {
+    const ws = new TikTokWS({
+      onStatus: (st, detail) => { setWsStatus(st); setWsDetail(detail || '') },
+      onRaw: () => {},
+      // Mở nối xong là xin ngay các event đã lỡ khi rớt mạng.
+      onOpen: () => { wsRef.current?.send({ type: 'sync', lastSeq: lastSeqRef.current }) },
+      onEvent: (raw) => {
+        let obj = raw
+        if (typeof raw === 'string') {
+          try { obj = JSON.parse(raw) } catch { obj = raw }
+        }
+        // Áp dụng 1 event: bỏ qua nếu seq đã nhận rồi (tránh tính 2 lần),
+        // rồi mới đưa qua bộ chuẩn hóa như event live bình thường.
+        const deliver = (item) => {
+          if (item && typeof item === 'object' && typeof item.seq === 'number') {
+            if (seqTrackerRef.current.seen(item.seq)) return
+            lastSeqRef.current = Math.max(lastSeqRef.current, item.seq)
+          }
+          const norm = normalizeEvent(item)
+          const list = Array.isArray(norm) ? norm : [norm]
+          for (const ev of list) if (ev) handleEvent(ev)
+        }
+        // Gói bắt kịp từ connector: { type: 'catchup', events: [...] }
+        if (obj && typeof obj === 'object' && obj.type === 'catchup' && Array.isArray(obj.events)) {
+          for (const item of obj.events) deliver(item)
+          return
+        }
+        deliver(obj)
+      },
+    })
+    wsRef.current = ws
+    const saved = loadWs()
+    if (saved.wsUrl) ws.connect(saved.wsUrl, saved.key || '')
+    return () => ws.disconnect(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Mở khóa âm thanh sau lần chạm đầu (trình duyệt chặn autoplay) ──
+  useEffect(() => {
+    const unlock = () => soundRef.current.ensure()
+    window.addEventListener('pointerdown', unlock)
+    return () => window.removeEventListener('pointerdown', unlock)
+  }, [])
+
+  useEffect(() => { takeSnap() }, [takeSnap])
+
+  // ── Chế độ xem thử ?demo=1: tự bắt đầu trận + tự kéo 2 đội qua lại để
+  // xem sân 3D mà không cần live thật. Không có ?demo=1 thì không chạy.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (new URLSearchParams(window.location.search).get('demo') !== '1') return
+    const t1 = setTimeout(() => {
+      joinTeam(stateRef.current, 'A', 'Lan Thử', 'demo-a')
+      joinTeam(stateRef.current, 'B', 'Minh Thử', 'demo-b')
+      doStart()
+    }, 800)
+    const powers = [1, 3, 6, 12]
+    let n = 0
+    const iv = setInterval(() => {
+      const s = stateRef.current
+      if (!s) return
+      if (s.phase === 'pulling') {
+        const teamId = n % 2 === 0 ? 'A' : 'B'
+        const power = powers[Math.floor(Math.random() * powers.length)]
+        applyPull(s, teamId, power, { nickname: 'Khán giả thử', userId: `demo-${n}` })
+        n++
+        if (n % 7 === 0) applyLikeBoost(s, 100)
+      }
+    }, 700)
+    return () => { clearTimeout(t1); clearInterval(iv) }
+  }, [doStart])
+
+  const toggleMute = useCallback(() => {
+    const s = stateRef.current
+    s.settings.soundOn = !s.settings.soundOn
+    soundRef.current.enabled = s.settings.soundOn
+    saveSettings(s.settings)
+    setMuted(!s.settings.soundOn)
+    takeSnap()
+  }, [takeSnap])
+
+  return {
+    stateRef, snap, wsStatus, wsDetail, wsLog, muted,
+    start: doStart, toggleMute,
+    apiConfigured: Boolean(import.meta.env?.VITE_API_URL),
+  }
+}

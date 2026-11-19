@@ -1,7 +1,7 @@
-// ─── PET MARATHON LIVE · server/server.js ──────────────────────────────────
+// ─── KÉO CO LIVE · server/server.js ──────────────────────────────────
 // API tối giản chạy trên Render Web Service (Node, không cần thư viện ngoài):
 //   GET  /health       — kiểm tra sống
-//   POST /race-result  — nhận kết quả 1 cuộc đua, kiểm tra rồi ghi Supabase
+//   POST /match-result — nhận kết quả 1 trận kéo co, kiểm tra rồi ghi Supabase
 //   GET  /leaderboard  — top người thắng nhiều nhất
 // Supabase là TÙY CHỌN: chưa có SUPABASE_URL / SUPABASE_SERVICE_KEY thì API
 // vẫn chạy, chỉ lưu tạm trong bộ nhớ của service (mất khi service khởi động
@@ -68,12 +68,9 @@ async function supabaseSelect(view) {
 
 function validResult(body) {
   if (!body || typeof body !== 'object') return 'Dữ liệu gửi lên không đúng dạng'
-  if (!body.raceId || typeof body.raceId !== 'string') return 'Thiếu mã cuộc đua'
-  if (!Array.isArray(body.results) || body.results.length === 0) return 'Thiếu danh sách kết quả'
-  if (!body.winner || typeof body.winner.nickname !== 'string') return 'Thiếu thông tin người thắng'
-  for (const r of body.results) {
-    if (typeof r.nickname !== 'string' || typeof r.place !== 'number') return 'Kết quả từng thú chưa đủ thông tin'
-  }
+  if (!body.matchId || typeof body.matchId !== 'string') return 'Thiếu mã trận đấu'
+  if (!body.winnerTeam || (body.winnerTeam !== 'A' && body.winnerTeam !== 'B')) return 'Thiếu đội thắng'
+  if (!body.score || typeof body.score.A !== 'number' || typeof body.score.B !== 'number') return 'Thiếu tỉ số trận'
   return null
 }
 
@@ -86,36 +83,33 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/') {
-    return sendJson(res, 200, { ok: true, service: 'pet-marathon-live-api', endpoints: ['GET /health', 'POST /race-result', 'GET /leaderboard'] })
+    return sendJson(res, 200, { ok: true, service: 'pet-marathon-live-api', endpoints: ['GET /health', 'POST /match-result', 'GET /leaderboard'] })
   }
 
-  if (req.method === 'POST' && url.pathname === '/race-result') {
+  if (req.method === 'POST' && url.pathname === '/match-result') {
     let body
     try { body = await readBody(req) } catch { return sendJson(res, 400, { ok: false, error: 'Dữ liệu gửi lên không đọc được' }) }
     const err = validResult(body)
     if (err) return sendJson(res, 400, { ok: false, error: err })
-    const winner = body.winner
     const row = {
-      race_id: body.raceId,
-      winner_nickname: winner.nickname,
-      winner_pet: winner.petName || null,
-      winner_is_bot: !!winner.isBot,
-      duration_ms: typeof body.durationMs === 'number' ? body.durationMs : null,
+      match_id: body.matchId,
+      winner_team: body.winnerTeam,
+      score_a: body.score.A,
+      score_b: body.score.B,
       total_gifts: typeof body.gifts === 'number' ? body.gifts : 0,
-      results: body.results,
     }
     memoryResults.push(row)
     if (memoryResults.length > 200) memoryResults.shift()
     if (supabaseOn) {
       try {
-        await supabaseInsert('race_results', [row])
-        return sendJson(res, 200, { ok: true, saved: true, raceId: body.raceId })
+        await supabaseInsert('match_results', [row])
+        return sendJson(res, 200, { ok: true, saved: true, matchId: body.matchId })
       } catch (e) {
         // Ghi mạng lỗi thì vẫn nhận kết quả (đã lưu tạm), báo rõ để Admin biết
-        return sendJson(res, 200, { ok: true, saved: false, raceId: body.raceId, note: 'Đã nhận nhưng chưa lưu lên bảng xếp hạng: ' + e.message })
+        return sendJson(res, 200, { ok: true, saved: false, matchId: body.matchId, note: 'Đã nhận nhưng chưa lưu lên bảng xếp hạng: ' + e.message })
       }
     }
-    return sendJson(res, 200, { ok: true, saved: false, raceId: body.raceId, note: 'Chưa nối bảng xếp hạng nên chỉ lưu tạm trên service.' })
+    return sendJson(res, 200, { ok: true, saved: false, matchId: body.matchId, note: 'Chưa nối bảng xếp hạng nên chỉ lưu tạm trên service.' })
   }
 
   if (req.method === 'GET' && url.pathname === '/leaderboard') {
@@ -136,20 +130,13 @@ const server = http.createServer(async (req, res) => {
 function aggregate(rows) {
   const map = new Map()
   for (const r of rows) {
-    if (r.winner_is_bot) continue
-    const cur = map.get(r.winner_nickname) || { winner_nickname: r.winner_nickname, wins: 0, total_races: 0 }
+    const name = r.winner_team === 'A' ? 'Đội Đỏ' : 'Đội Xanh'
+    const cur = map.get(name) || { winner_nickname: name, wins: 0, total_races: 0 }
     cur.wins += 1
-    map.set(r.winner_nickname, cur)
+    cur.total_races += 1
+    map.set(name, cur)
   }
-  for (const r of rows) {
-    for (const p of r.results || []) {
-      if (p.isBot) continue
-      const cur = map.get(p.nickname) || { winner_nickname: p.nickname, wins: 0, total_races: 0 }
-      cur.total_races += 1
-      map.set(p.nickname, cur)
-    }
-  }
-  return [...map.values()].sort((a, b) => b.wins - a.wins || b.total_races - a.total_races).slice(0, 10)
+  return [...map.values()].sort((a, b) => b.wins - a.wins).slice(0, 10)
 }
 
 server.listen(PORT, () => {
