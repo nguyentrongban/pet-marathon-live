@@ -298,7 +298,7 @@ export default function TugScene({ liveRef }) {
     // mờ dần tự nhiên như ngoài đời (không cắt cụt).
     scene.fog = new THREE.Fog(0xbfd4e6, 55, 160)
     const camera = new THREE.PerspectiveCamera(66, width / height, 0.1, 400)
-    camera.position.set(0, 6.2, 18.5)
+    camera.position.set(0, 5.8, 16.5)
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x4a7c59, 0.7))
     // Nắng CHÍNH từ phía trước-trái-cao (hướng về camera): chiếu thẳng
@@ -1020,7 +1020,7 @@ export default function TugScene({ liveRef }) {
     // key "A-0" -> true khi người đó đã chạm bùn (để văng bùn 1 lần duy nhất)
     const humanFall = new Map()
     const humanBlob = new Map()
-    const camBase = new THREE.Vector3(0, 6.2, 18.5)
+    const camBase = new THREE.Vector3(0, 5.8, 16.5)
     const lookTarget = new THREE.Vector3(0, 1.1, 0)
     // Vị trí camera hiện tại (trượt mượt giữa toàn cảnh và cận cảnh té bùn).
     const curCamPos = camBase.clone()
@@ -1440,19 +1440,32 @@ export default function TugScene({ liveRef }) {
         }
       }
 
-      // ── Camera: toàn cảnh lúc kéo, quay cận đội thua lúc té bùn ──
-      // Hết màn: camera trượt lại gần hố bùn (mượt, ~1s) để xem rõ đội thua
-      // té xuống bùn ra sao — bùn văng, người lấm lem; sang màn mới thì
-      // trượt ra lại toàn cảnh. Ngã xuống bùn thì camera rung nhẹ 1 cái.
+      // ── Camera: toàn cảnh lúc kéo, hết màn quay cận 2 chặng ──
+      // Hết màn: 4 giây đầu camera trượt lại gần hố bùn để xem rõ đội thua
+      // té xuống bùn ra sao (bùn văng, người lấm lem); từ giây thứ 4 trở đi
+      // camera chạy sang đội thắng để xem họ ăn mừng (nhảy + vẫy tay).
+      // Sang màn mới thì trượt ra lại toàn cảnh. Ngã xuống bùn thì camera
+      // rung nhẹ 1 cái.
       shake *= Math.exp(-5 * dt)
       const sway = Math.sin(time * 0.15) * 0.25
       if ((phase === 'roundEnd' || phase === 'matchEnd') && loserTeam) {
-        // Đội thua bị kéo về phía đội thắng: A thua thì nằm bên phải hố
-        // (+X), B thua thì nằm bên trái (-X). Camera đứng phía ngược lại
-        // để thấy mặt + cả người họ lúc té.
-        const ls = loserTeam === 'A' ? 1 : -1
-        tmpCamPos.set(-ls * 4.2, 3.0, 11.0)
-        tmpLook.set(ls * 0.7, 0.35, 0)
+        const endElapsed = now - roundEndStart
+        if (endElapsed < 4) {
+          // Chặng 1 (0–4s): đội thua té bùn. Đội thua bị kéo về phía đội
+          // thắng: A thua thì nằm bên phải hố (+X), B thua thì nằm bên
+          // trái (-X). Camera đứng phía ngược lại để thấy mặt + cả người
+          // họ lúc té.
+          const ls = loserTeam === 'A' ? 1 : -1
+          tmpCamPos.set(-ls * 4.2, 3.0, 11.0)
+          tmpLook.set(ls * 0.7, 0.35, 0)
+        } else {
+          // Chặng 2 (từ 4s trở đi): đội thắng ăn mừng. ws = phía đội thắng
+          // (A ở -X, B ở +X). Camera đứng gần đội thắng, hơi chếch sang
+          // phía ngược lại để thấy mặt họ lúc nhảy ăn mừng.
+          const ws = winnerTeam === 'A' ? -1 : 1
+          tmpCamPos.set(-ws * 2.2, 2.8, 10.5)
+          tmpLook.set(ws * 2.2, 1.0, 0)
+        }
       } else {
         tmpCamPos.set(camBase.x + sway, camBase.y, camBase.z + Math.abs(rope) * 1.5)
         tmpLook.copy(lookTarget)

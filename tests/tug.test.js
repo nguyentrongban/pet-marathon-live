@@ -54,7 +54,7 @@ test('mỗi người vào đội là +1 lực kéo liên tục', () => {
 
 test('đội đông người kéo thắng đội ít người (không cần quà)', () => {
   const s = crowdMatch(10, 1)
-  step(s, 15)
+  step(s, 8)
   assert.equal(s.phase, 'roundEnd', 'đội 10 người phải thắng màn')
   assert.equal(s.roundWinner, 'A')
   assert.equal(s.teams.A.roundWins, 1)
@@ -82,6 +82,9 @@ test('quà tặng bùng lực rồi tắt dần sau vài giây', () => {
   assert.equal(s.teams.A.boost, 100)
   assert.equal(s.teams.A.pullRate, 101, '1 người + 100 bùng = sức mạnh 101')
   assert.ok(approx(s.rope, 0), 'quà không nhảy dây ngay — dây chạy theo tốc độ')
+  // Tặng luôn cho B để dây cân bằng (không ai chạm vạch thắng 0,5 giữa chừng)
+  // thì mới đo được bùng tắt dần đủ 5 giây.
+  applyPull(s, 'B', 100, { nickname: 'Nam', userId: 'nam' })
   step(s, 5)
   const b = s.teams.A.boost
   assert.ok(b < 40 && b > 30, `sau 5s bùng phải còn ~37, được ${b}`)
@@ -480,8 +483,8 @@ test('đếm ngược + hết giờ màn chạy đúng với dt lớn', () => {
   step(s, 46)
   assert.equal(s.phase, 'roundEnd', 'hết 45 giây phải xong màn')
   assert.equal(s.roundWinner, null, 'không ai kéo thì hòa')
-  step(s, 8.5)
-  assert.equal(s.phase, 'countdown', 'hết 8 giây nghỉ phải sang màn sau')
+  step(s, 10.5)
+  assert.equal(s.phase, 'countdown', 'hết 10 giây nghỉ phải sang màn sau')
   assert.equal(s.round, 2)
 })
 

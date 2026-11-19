@@ -107,6 +107,8 @@ input, select { font-family: inherit; }
 .rm-zone.red { left: 0; background: linear-gradient(90deg, #e03131, #ff8787); }
 .rm-zone.blue { right: 0; background: linear-gradient(90deg, #74c0fc, #1971c2); }
 .rm-center { position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: #fff; opacity: .9; }
+/* Vạch thắng: cờ chạm tới vạch này là thắng màn ngay (không chờ hết giờ). */
+.rm-winmark { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px; background: #ffd60a; box-shadow: 0 0 6px rgba(255, 214, 10, .9); }
 .rm-flag {
   position: absolute; top: 50%; transform: translate(-50%, -50%);
   color: #ff3b30; filter: drop-shadow(0 2px 3px rgba(0,0,0,.6));
@@ -188,9 +190,9 @@ input, select { font-family: inherit; }
 }
 @keyframes pml-airdrop-fall {
   0% { top: -110px; }
-  70% { top: 20%; }
-  85% { top: 24%; }
-  100% { top: 22%; }
+  70% { top: 34%; }
+  85% { top: 38%; }
+  100% { top: 36%; }
 }
 
 /* ── Huy hiệu hạng Free Fire + tag ĐANG ĐẤU trong BXH tỉnh ── */
@@ -229,10 +231,10 @@ input, select { font-family: inherit; }
 
 /* ── Lật kèo: 1 món quà mạnh hơn cả đội kia — hiện to giữa màn hình 2,5 giây ── */
 .pml-flip {
-  position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); z-index: 8;
+  position: absolute; top: 25%; left: 50%; transform: translate(-50%, -50%); z-index: 8;
   background: linear-gradient(90deg, #0ea5e9, #2563eb); color: #fff;
-  border: 2px solid rgba(255,255,255,.8); border-radius: 18px; padding: 12px 16px;
-  font-size: 17px; font-weight: 900; text-align: center; line-height: 1.35;
+  border: 2px solid rgba(255,255,255,.8); border-radius: 18px; padding: 10px 14px;
+  font-size: 16px; font-weight: 900; text-align: center; line-height: 1.35;
   box-shadow: 0 10px 30px rgba(37, 99, 235, .6); text-shadow: 0 2px 4px rgba(0,0,0,.4);
   animation: pml-flip-in .3s ease-out; pointer-events: none; max-width: 86vw;
 }
@@ -267,7 +269,7 @@ input, select { font-family: inherit; }
    có hiệu ứng; hết giờ thì React gỡ khỏi DOM. Animation chỉ ở phần tử
    con để mở đầu cho đẹp.) */
 .pml-gift {
-  position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); z-index: 9;
+  position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); z-index: 9;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   pointer-events: none; text-align: center;
 }
@@ -341,7 +343,7 @@ input, select { font-family: inherit; }
   100% { transform: scale(2.6); opacity: 0; }
 }
 .pml-fireworks-name {
-  position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%);
+  position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%);
   display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center;
 }
 .pml-fireworks-name .fw-crown { display: flex; align-items: center; justify-content: center; gap: 8px; color: #ffd60a; line-height: 1; animation: pml-gift-pop .5s cubic-bezier(.34, 1.56, .64, 1); }
@@ -375,13 +377,32 @@ input, select { font-family: inherit; }
 }
 
 /* ── BXH nhỏ ở góc trái dưới: ai tặng quà / thả tim nhiều nhất ── */
-.pml-bxh {
+/* ── Góc trái dưới: BXH + bảng giá quà xếp chồng ── */
+.pml-bl-stack {
   position: absolute; left: 10px; bottom: calc(104px + env(safe-area-inset-bottom)); z-index: 6;
+  display: flex; flex-direction: column; gap: 6px; max-width: 52vw; pointer-events: none;
+}
+.pml-bxh {
   background: rgba(8, 38, 26, .68); border: 1px solid rgba(255,255,255,.2); border-radius: 14px;
   padding: 8px 10px; backdrop-filter: blur(6px); box-shadow: 0 4px 14px rgba(0,0,0,.3);
-  pointer-events: none; max-width: 52vw;
+  pointer-events: none;
 }
-.pml-bxh-title { font-size: 12px; font-weight: 900; letter-spacing: .5px; margin-bottom: 4px; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.pml-bxh-title {
+  display: flex; align-items: center; gap: 4px; background: none; border: none; padding: 0;
+  color: inherit; font: inherit; font-size: 12px; font-weight: 900; letter-spacing: .5px;
+  margin-bottom: 4px; text-shadow: 0 1px 2px rgba(0,0,0,.5); cursor: pointer; pointer-events: auto;
+}
+/* BXH thu gọn: chỉ tỉnh dẫn đầu + người tặng nhiều nhất (2 dòng). */
+.pml-bxh-mini { display: flex; flex-direction: column; gap: 2px; }
+.pml-bxh-minirow { display: flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 800; line-height: 1.4; text-shadow: 0 1px 2px rgba(0,0,0,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Bảng giá quà: quà nào đáng bao nhiêu lực kéo. */
+.pml-gift-legend {
+  background: rgba(8, 38, 26, .68); border: 1px solid rgba(255,255,255,.2); border-radius: 12px;
+  padding: 6px 9px; backdrop-filter: blur(6px); box-shadow: 0 4px 14px rgba(0,0,0,.3);
+}
+.pml-gift-legend-title { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 900; margin-bottom: 2px; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.pml-gift-legend-row { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; line-height: 1.5; text-shadow: 0 1px 2px rgba(0,0,0,.5); white-space: nowrap; }
+.pml-gl-ic { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #ffe9a8 70%); color: #b45309; border: 1.5px solid #fff; flex: none; }
 .pml-bxh-sec { margin-top: 5px; }
 .pml-bxh-head { font-size: 10.5px; font-weight: 800; opacity: .85; margin-bottom: 2px; }
 .pml-bxh-row { display: flex; gap: 5px; align-items: center; font-size: 12px; line-height: 1.45; }

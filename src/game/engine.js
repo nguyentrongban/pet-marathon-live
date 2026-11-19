@@ -164,8 +164,8 @@ export const DEFAULT_SETTINGS = {
   roundSeconds: 45,          // 1 màn kéo tối đa 45 giây (chưa tính tim cộng thêm)
   countdownSeconds: 3,
   winsToMatch: 2,            // thắng 2 màn trước thì thắng trận (best of 3 — tối đa 3 màn)
-  winLine: 0.9,              // dây chạm ±0,9 là thắng màn ngay
-  ropeSpeed: 0.12,           // tốc độ dây tối đa — 1 đội áp đảo hoàn toàn thì dây chạy 0,12/giây
+  winLine: 0.5,              // vạch giữa chạm ±0,5 (cờ chạy qua 3/4 thước) là thắng màn ngay — đội kéo rõ ràng thì không phải chờ hết giờ
+  ropeSpeed: 0.15,           // tốc độ vạch giữa tối đa — 1 phe áp đảo hoàn toàn thì vạch chạy 0,15/giây
   ropeDecay: 0.02,           // dây tự trôi nhẹ về giữa 2%/giây
   boostDecay: 0.2,           // quà tặng tắt dần — bùng lực giảm một nửa sau ~3,5 giây
   comebackAt: 0.55,          // đội thua quá 0,55 thì vào "cơ hội cuối"
@@ -634,7 +634,7 @@ export function endRound(state, winnerTeamId) {
   const winnerLabel = winnerTeamId ? teamLabel(state, winnerTeamId) : null
   state.roundWinner = winnerTeamId
   state.phase = 'roundEnd'
-  state.nextRoundIn = 8
+  state.nextRoundIn = 10 // hết màn: 4s xem đội thua té bùn + 6s xem đội thắng ăn mừng rồi mới sang màn sau
   if (winnerTeamId) {
     state.teams[winnerTeamId].roundWins++
     state.luckyStar = { team: winnerTeamId }

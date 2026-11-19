@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import {
-  BookOpen, Cable, Flag, Flame, Gift, Hand, Handshake, Heart,
+  BookOpen, Cable, ChevronDown, ChevronUp, Flag, Flame, Gift, Hand, Handshake, Heart,
   Hourglass, MapPin, MessageCircle, Package, Pause, Shield, Sparkles, Star, Timer, Trophy,
   User, Users, Volume2, VolumeX, Waves, X, Zap,
 } from 'lucide-react'
@@ -60,6 +60,9 @@ function DisplayGame() {
   const game = useTugOfWar()
   const { stateRef, snap, wsStatus, muted } = game
   const [guideOpen, setGuideOpen] = useState(false)
+  // BXH mặc định THU GỌN (chỉ 2 dòng: tỉnh dẫn đầu + người tặng nhiều nhất)
+  // để không che sân 3D; bấm vào tiêu đề BXH để mở rộng xem đủ top 3.
+  const [bxhOpen, setBxhOpen] = useState(false)
   const present = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('present') === '1'
 
   useEffect(() => { document.title = 'KÉO CO LIVE — Đại chiến kéo co TikTok!' }, [])
@@ -137,6 +140,9 @@ function DisplayGame() {
               <div className="rm-zone red" />
               <div className="rm-zone blue" />
               <div className="rm-center" />
+              {/* Vạch thắng: cờ chạm tới vạch này là thắng màn ngay (không chờ hết giờ). */}
+              <div className="rm-winmark" style={{ left: `${50 - (s?.settings?.winLine || 0.5) * 48}%` }} />
+              <div className="rm-winmark" style={{ left: `${50 + (s?.settings?.winLine || 0.5) * 48}%` }} />
               <div className="rm-flag" style={{ left: `${50 - rope * 48}%` }}><Flag size={16} fill="currentColor" /></div>
             </div>
             <div className="rm-labels"><span><TeamDot team="A" /> {teamShort('A')} thắng</span><span>{teamShort('B')} thắng <TeamDot team="B" /></span></div>
@@ -224,52 +230,81 @@ function DisplayGame() {
 
         {/* ── BXH nhỏ ở góc trái dưới: ai tặng quà / thả tim nhiều nhất ──
              Lưu lại qua các màn/trận + tải lại trang (chỉ xóa khi bấm Xóa BXH ở Admin). */}
-        {hasBxh && (
-          <div className="pml-bxh">
-            <div className="pml-bxh-title"><Trophy size={15} /> BXH</div>
-            {(bxh.gifters?.length || 0) > 0 && (
-              <div className="pml-bxh-sec">
-                <div className="pml-bxh-head"><Gift size={13} /> Tặng quà nhiều nhất</div>
-                {bxh.gifters.map((g, i) => (
-                  <div className="pml-bxh-row" key={`g${i}`}>
-                    <span className={`pml-bxh-rank r${i + 1}`}>{i + 1}</span>
-                    <span className="pml-bxh-name">{g.nickname}</span>
-                    <span className="pml-bxh-val"><Zap size={12} /> {Math.round(g.power)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {(bxh.likers?.length || 0) > 0 && (
-              <div className="pml-bxh-sec">
-                <div className="pml-bxh-head"><Heart size={13} fill="currentColor" /> Thả tim nhiều nhất</div>
-                {bxh.likers.map((g, i) => (
-                  <div className="pml-bxh-row" key={`l${i}`}>
-                    <span className={`pml-bxh-rank r${i + 1}`}>{i + 1}</span>
-                    <span className="pml-bxh-name">{g.nickname}</span>
-                    <span className="pml-bxh-val"><Heart size={12} fill="currentColor" /> {g.likes}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {provinces.length > 0 && (
-              <div className="pml-bxh-sec">
-                <div className="pml-bxh-head"><MapPin size={13} /> Tỉnh thành dẫn đầu</div>
-                {provinces.map((c, i) => {
-                  const rank = provinceRank(c.power)
-                  return (
-                    <div className="pml-bxh-row" key={`c${i}`}>
-                      <span className={`pml-bxh-rank r${i + 1}`}>{i + 1}</span>
-                      <span className="pml-bxh-name">{c.short || c.name}</span>
-                      <span className="pml-bxh-rankbadge" style={{ background: rank.color }}>{rank.name}</span>
-                      <span className="pml-bxh-val">{Math.round(c.power)}</span>
+        {/* ── Góc trái dưới: BXH (thu gọn mặc định, bấm để mở) + bảng giá quà ── */}
+        <div className="pml-bl-stack">
+          {hasBxh && (
+            <div className="pml-bxh">
+              <button className="pml-bxh-title" type="button" onClick={() => setBxhOpen((v) => !v)}>
+                <Trophy size={15} /> BXH {bxhOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+              {bxhOpen ? (
+                <>
+                  {(bxh.gifters?.length || 0) > 0 && (
+                    <div className="pml-bxh-sec">
+                      <div className="pml-bxh-head"><Gift size={13} /> Tặng quà nhiều nhất</div>
+                      {bxh.gifters.map((g, i) => (
+                        <div className="pml-bxh-row" key={`g${i}`}>
+                          <span className={`pml-bxh-rank r${i + 1}`}>{i + 1}</span>
+                          <span className="pml-bxh-name">{g.nickname}</span>
+                          <span className="pml-bxh-val"><Zap size={12} /> {Math.round(g.power)}</span>
+                        </div>
+                      ))}
                     </div>
-                  )
-                })}
-                <div className="pml-bxh-leader">📍 {provinces[0].name} dẫn đầu — quà của {provinces[0].name} mạnh hơn ×1,5!</div>
-              </div>
-            )}
+                  )}
+                  {(bxh.likers?.length || 0) > 0 && (
+                    <div className="pml-bxh-sec">
+                      <div className="pml-bxh-head"><Heart size={13} fill="currentColor" /> Thả tim nhiều nhất</div>
+                      {bxh.likers.map((g, i) => (
+                        <div className="pml-bxh-row" key={`l${i}`}>
+                          <span className={`pml-bxh-rank r${i + 1}`}>{i + 1}</span>
+                          <span className="pml-bxh-name">{g.nickname}</span>
+                          <span className="pml-bxh-val"><Heart size={12} fill="currentColor" /> {g.likes}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {provinces.length > 0 && (
+                    <div className="pml-bxh-sec">
+                      <div className="pml-bxh-head"><MapPin size={13} /> Tỉnh thành dẫn đầu</div>
+                      {provinces.map((c, i) => {
+                        const rank = provinceRank(c.power)
+                        return (
+                          <div className="pml-bxh-row" key={`c${i}`}>
+                            <span className={`pml-bxh-rank r${i + 1}`}>{i + 1}</span>
+                            <span className="pml-bxh-name">{c.short || c.name}</span>
+                            <span className="pml-bxh-rankbadge" style={{ background: rank.color }}>{rank.name}</span>
+                            <span className="pml-bxh-val">{Math.round(c.power)}</span>
+                          </div>
+                        )
+                      })}
+                      <div className="pml-bxh-leader">📍 {provinces[0].name} dẫn đầu — quà của {provinces[0].name} mạnh hơn ×1,5!</div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="pml-bxh-mini">
+                  {provinces.length > 0 && (
+                    <div className="pml-bxh-minirow"><MapPin size={12} /> {provinces[0].short || provinces[0].name} dẫn đầu · {Math.round(provinces[0].power)} lực</div>
+                  )}
+                  {(bxh.gifters?.length || 0) > 0 && (
+                    <div className="pml-bxh-minirow"><Gift size={12} /> {bxh.gifters[0].nickname} · {Math.round(bxh.gifters[0].power)} lực</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {/* Bảng giá quà: quà nào đáng bao nhiêu lực kéo, để khán giả biết tặng gì. */}
+          <div className="pml-gift-legend">
+            <div className="pml-gift-legend-title"><Gift size={12} /> Quà = lực kéo</div>
+            <div className="pml-gift-legend-row">
+              <span className="pml-gl-ic"><GiftIcon gift="hoa hồng" size={14} /></span> Hoa hồng +1
+              <span className="pml-gl-ic"><GiftIcon gift="bing chilling" size={14} /></span> Kem +5
+            </div>
+            <div className="pml-gift-legend-row">
+              10 xu +10 · 20 xu +25 · <span className="pml-gl-ic"><GiftIcon gift="hạc giấy" size={14} /></span> Hạc giấy +100
+            </div>
           </div>
-        )}
+        </div>
 
         {/* ── Tạm dừng: dải nhỏ ở dưới, không che sân ── */}
         {s?.paused && (
