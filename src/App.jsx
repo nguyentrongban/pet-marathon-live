@@ -112,7 +112,7 @@ function DisplayGame() {
   }
 
   return (
-    <div className="pml-app" data-version={APP_VERSION}>
+    <div className="pml-app" data-version={APP_VERSION} data-phase={phase}>
       <div className="pml-stage">
         <TugScene liveRef={stateRef} />
 
@@ -127,7 +127,7 @@ function DisplayGame() {
             {/* Thử giọng đọc ngay trên tab màn hình này: bấm là đọc liền bằng
                 giọng máy (không chờ FPT.AI). Bấm thử trong Admin thì tab màn
                 hình không có cử chỉ chạm nên iPhone chặn, nghe không thấy. */}
-            <button className="pml-iconbtn" onClick={game.testVoice} aria-label="Thử giọng đọc" title="Thử giọng đọc">
+            <button className="pml-iconbtn pml-micbtn" onClick={game.testVoice} aria-label="Thử giọng đọc" title="Thử giọng đọc">
               <Mic size={20} />
             </button>
             {/* Nhạc nền: bấm để bật/tắt nhạc nền (6 bài miễn phí, tự chạy nối
