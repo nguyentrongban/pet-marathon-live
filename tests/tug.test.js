@@ -488,8 +488,11 @@ test('đếm ngược + hết giờ màn chạy đúng với dt lớn', () => {
   assert.equal(s.phase, 'roundEnd', 'hết 45 giây phải xong màn')
   assert.equal(s.roundWinner, null, 'không ai kéo thì hòa')
   step(s, 10.5)
-  assert.equal(s.phase, 'countdown', 'hết 10 giây nghỉ phải sang màn sau')
-  assert.equal(s.round, 2)
+  // Hết 10 giây nghỉ thì VỀ CHỜ (không tự sang màn sau nữa) — streamer
+  // xem đủ người rồi ấn bắt đầu mới sang màn sau.
+  assert.equal(s.phase, 'waiting', 'hết 10 giây nghỉ thì về chờ, chờ streamer ấn bắt đầu')
+  assert.equal(s.round, 1, 'chưa ấn thì vẫn là màn 1')
+  assert.equal(s.waitingNextRound, true, 'đang chờ bắt đầu màn sau')
 })
 
 // ── 14. BXH: ai tặng quà / thả tim nhiều nhất — lưu lại cả phiên ───────────
@@ -1248,6 +1251,52 @@ await asyncTest('nhạc nền: hết bài tự chuyển bài sau; tắt nhạc t
     assert.equal(m2.volume, 0.5, 'mở lại vẫn nhớ âm lượng')
     assert.equal(m2.index, 1, 'mở lại vẫn nhớ bài đang phát')
   } finally { unmockMusicBrowser() }
+})
+
+
+// ─── Bắt đầu từng màn bằng tay (streamer ấn) ─────────────────────────────
+// Hết màn/trận thì KHÔNG tự chạy tiếp — về chờ, hiện bảng hướng dẫn, chờ
+// streamer xem đủ người rồi ấn bắt đầu. Ấn bắt đầu = doStart trong
+// useTugOfWar (round++ + startRound nếu đang chờ màn sau, startMatch nếu
+// chờ trận mới); ở đây kiểm tra phần engine (tick → chờ) + mô phỏng phần
+// bắt đầu bằng chính hàm engine mà doStart gọi.
+test('hết màn thì về chờ (không tự sang màn sau), ấn bắt đầu mới sang màn 2', () => {
+  const s = freshMatch()
+  assert.equal(s.phase, 'pulling')
+  endRound(s, 'A')
+  assert.equal(s.phase, 'roundEnd', 'thắng màn 1 thì vào roundEnd')
+  assert.equal(s.teams.A.roundWins, 1)
+  step(s, 11) // hết 10s ăn mừng/té bùn
+  assert.equal(s.phase, 'waiting', 'hết roundEnd thì về chờ, không tự sang màn sau')
+  assert.equal(s.waitingNextRound, true, 'đang chờ bắt đầu màn sau của trận đang đấu')
+  assert.equal(s.round, 1, 'chưa ấn thì vẫn là màn 1')
+  // Mô phỏng streamer ấn bắt đầu (doStart): round++ + startRound.
+  s.round++
+  startRound(s)
+  assert.equal(s.phase, 'countdown', 'ấn bắt đầu thì đếm ngược màn 2')
+  assert.equal(s.round, 2, 'sang màn 2')
+  assert.equal(s.waitingNextRound, false, 'đã bắt đầu thì hết chờ')
+})
+
+test('hết trận thì về chờ (không tự bắt đầu trận mới)', () => {
+  const s = freshMatch()
+  endRound(s, 'A') // thắng màn 1 (1-0)
+  step(s, 11) // về chờ màn 2
+  s.round++
+  startRound(s)
+  s.phase = 'pulling'
+  endRound(s, 'A') // thắng màn 2 (2-0) → vô địch trận
+  assert.equal(s.phase, 'matchEnd', 'thắng 2 màn thì hết trận')
+  assert.equal(s.matchWinner, 'A')
+  step(s, 16) // hết 15s chờ hết trận
+  assert.equal(s.phase, 'waiting', 'hết matchEnd thì về chờ, không tự bắt đầu trận mới')
+  assert.equal(s.waitingNextRound, false, 'đang chờ bắt đầu trận mới')
+  assert.equal(s.teams.A.roundWins, 2, 'tỉ số trận cũ vẫn giữ nguyên khi chờ')
+  // Mô phỏng streamer ấn bắt đầu trận mới (doStart → startMatch).
+  startMatch(s)
+  assert.equal(s.round, 1, 'trận mới bắt đầu từ màn 1')
+  assert.equal(s.teams.A.roundWins, 0, 'trận mới reset tỉ số')
+  assert.equal(s.phase, 'countdown')
 })
 
 

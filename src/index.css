@@ -69,15 +69,21 @@ input, select { font-family: inherit; }
    hết nên màn hình nhìn rối. Vì vậy ẨN hết những gì không cần thiết cho
    người xem — chỉ giữ lại: cảnh 3D, bảng tỉ số 2 đội + vòng + giờ, thước
    dây, và các hiệu ứng tạm thời (quà, BOOYAH!, LẬT KÈO!, bùn dính ống
-   kính, thùng tiếp tế). Những thứ đã ẩn (điều khiển vẫn dùng được ở
-   Admin): nút tắt tiếng / thử giọng / nhạc / Cách chơi, BXH, bảng giá
-   quà, dòng tên bài nhạc, thanh dưới (số màn · số tim · trạng thái nối
-   live). Muốn hiện lại cái nào thì xóa dòng display:none tương ứng. */
-.pml-top-actions,
-.pml-bxh,
-.pml-gift-legend,
+   kính, thùng tiếp tế). Những thứ tấn kêu PHẢI CÓ thì hiện lại: nút nhạc
+   (góc trên phải), BXH, bảng giá quà. Còn ẩn: nút tắt tiếng / thử giọng /
+   Cách chơi (chỉ giữ nút nhạc trong .pml-top-actions), dòng tên bài nhạc,
+   thanh dưới (số màn · số tim · trạng thái nối live). Mọi điều khiển đã
+   ẩn vẫn dùng được ở Admin. Muốn hiện lại cái nào thì xóa dòng
+   display:none tương ứng. */
+.pml-top-actions > :not(.pml-musicbtn) { display: none !important; }
 .pml-nowplaying,
 .pml-bottombar { display: none !important; }
+/* Bảng hướng dẫn trước khi vô game: song ngữ, mỗi dòng 1 icon + tiếng
+   Việt đậm ở trên, tiếng Anh nhỏ nhạt ở dưới — nhìn vô là hiểu ngay. */
+.pml-wait-row { display: flex; gap: 8px; align-items: flex-start; text-align: left; }
+.pml-wait-row svg { flex: none; margin-top: 2px; }
+.pml-wait-row div { display: flex; flex-direction: column; gap: 1px; }
+.pml-wait-row span { font-size: 12px; opacity: .75; font-weight: 400; }
 /* Dòng "đang phát nhạc": nhỏ, ở dưới thanh trên, bấm nút ⏭ để qua bài. */
 .pml-nowplaying {
   position: absolute; top: calc(52px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 5;

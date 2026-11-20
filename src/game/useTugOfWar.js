@@ -349,12 +349,31 @@ export function useTugOfWar() {
   }, [logWs, takeSnap])
 
   // ── Bắt đầu trận / màn ──
+  // Bắt đầu: streamer ấn (chạm màn hình / bình luận BẮT ĐẦU / nút Admin).
+  // Mỗi màn đều do streamer ấn bắt đầu — streamer xem đủ người rồi mới
+  // ấn, lúc chưa ấn thì bảng hướng dẫn vẫn hiện (phase 'waiting').
   const doStart = useCallback(() => {
     const s = stateRef.current
     if (s.phase === 'roundEnd') {
+      // Ấn sớm trong lúc ăn mừng (bỏ qua 10s chờ) → sang màn sau luôn.
       s.round++
       startRound(s)
-    } else if (s.phase === 'waiting' || s.phase === 'matchEnd') {
+      s.waitingNextRound = false
+    } else if (s.phase === 'waiting') {
+      if (s.waitingNextRound) {
+        // Đang chờ bắt đầu màn tiếp theo của trận đang đấu.
+        s.round++
+        startRound(s)
+        s.waitingNextRound = false
+      } else {
+        // Chờ bắt đầu trận mới (đầu live / sau khi hết trận).
+        for (const p of pendingJoinsRef.current.splice(0)) {
+          joinTeam(s, p.teamId || 'balance', p.nickname, p.userId, p.avatar || '')
+        }
+        startMatch(s)
+      }
+    } else if (s.phase === 'matchEnd') {
+      // Ấn sớm trong lúc chờ hết trận → bắt đầu trận mới luôn.
       for (const p of pendingJoinsRef.current.splice(0)) {
         joinTeam(s, p.teamId || 'balance', p.nickname, p.userId, p.avatar || '')
       }
@@ -602,6 +621,7 @@ export function useTugOfWar() {
       joinProvince(stateRef.current, 'hcm', 'Linh Thử', 'demo-b2')
       joinProvince(stateRef.current, 'danang', 'Tuấn Thử', 'demo-b3')
       doStart()
+      demoStarted = true
       // Tặng ngay 1 món quà to khi bắt đầu (để xem hiệu ứng pháo hoa + BXH).
       engineRef.current.receive({
         id: 'demo-gift-start', giftName: 'hạc giấy',
@@ -626,9 +646,20 @@ export function useTugOfWar() {
     ]
     // Có người vào xem live (để hiện toast "vừa vào xem" 2 giây).
     const demoJoiners = ['Bạn Mới', 'Người Xem Mới', 'Khách Lạ']
+    // Demo tự ấn bắt đầu màn sau (trận thật thì streamer ấn tay): chờ
+    // bảng hướng dẫn hiện ~3 giây rồi ấn, để xem thử vẫn chạy hết trận.
+    let demoStarted = false
+    let waitTicks = 0
     const iv = setInterval(() => {
       const s = stateRef.current
       if (!s) return
+      // Demo: hết màn/trận thì về chờ — tự ấn bắt đầu sau ~3 giây.
+      if (s.phase === 'waiting' && demoStarted) {
+        waitTicks++
+        if (waitTicks >= 4) { waitTicks = 0; doStart() }
+      } else {
+        waitTicks = 0
+      }
       // Trận mới reset đội tỉnh về trống → demo vào lại 6 người tỉnh mẫu
       // ở đầu màn (countdown) để màn sau vẫn đấu tỉnh thành, như khán
       // giả thật bình luận tỉnh mới.

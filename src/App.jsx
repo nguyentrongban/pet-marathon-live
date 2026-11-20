@@ -131,9 +131,11 @@ function DisplayGame() {
               <Mic size={20} />
             </button>
             {/* Nhạc nền: bấm để bật/tắt nhạc nền (6 bài miễn phí, tự chạy nối
-                nhau). Nhạc bắt đầu khi chạm màn hình lần đầu (iOS bắt buộc). */}
+                nhau). Nhạc bắt đầu khi chạm màn hình lần đầu (iOS bắt buộc).
+                Nút này có class riêng pml-musicbtn để CSS màn hình sạch chỉ
+                giữ lại nút nhạc, ẩn các nút còn lại ở góc trên. */}
             <button
-              className={`pml-iconbtn ${s?.music?.playing ? 'pml-music-on' : ''}`}
+              className={`pml-iconbtn pml-musicbtn ${s?.music?.playing ? 'pml-music-on' : ''}`}
               onClick={game.toggleMusic}
               aria-label={s?.music?.playing ? 'Tắt nhạc nền' : 'Bật nhạc nền'}
               title={s?.music?.playing ? 'Tắt nhạc nền' : 'Bật nhạc nền'}
@@ -384,35 +386,58 @@ function DisplayGame() {
           <div className="pml-result-banner"><Pause size={15} /> Tạm dừng — bình luận TIẾP để chơi tiếp</div>
         )}
 
-        {/* ── Chờ chọn đội: thẻ nhỏ ở dưới, chạm đâu cũng bắt đầu ── */}
+        {/* ── Chờ chọn đội: thẻ nhỏ ở dưới, chạm đâu cũng bắt đầu.
+               Song ngữ Việt + Anh, ngắn gọn nhìn vô là hiểu — cho cả khán
+               giả nước ngoài (bình luận tên nước cũng vào đội nước đó). ── */}
         {phase === 'waiting' && !s?.paused && (
           <>
             <div className="pml-wait-tap" onClick={game.start} />
             <div className="pml-wait-card" onClick={game.start}>
-              <div className="pml-wait-line"><MessageCircle size={14} /> <b>A</b> = đội bên trái <TeamDot team="A" /> · <b>B</b> = đội bên phải <TeamDot team="B" /> · <Gift size={14} /> Quà để kéo · <Heart size={14} fill="currentColor" /> 100 tim = +10s kéo</div>
-              <div className="pml-wait-line"><MapPin size={14} /> Bình luận tên tỉnh của bạn (Hà Nội, Sài Gòn, Đà Nẵng...) để vào đội tỉnh đó — 2 tỉnh có nhiều người bình luận nhất sẽ kéo nhau!</div>
-              <div className="pml-wait-go"><Hand size={16} /> Chạm màn hình để bắt đầu kéo co!</div>
+              <div className="pml-wait-row">
+                <MessageCircle size={15} />
+                <div>
+                  <b>Bình luận tên tỉnh / nước để vào đội</b>
+                  <span>Comment your province / country to join its team</span>
+                </div>
+              </div>
+              <div className="pml-wait-row">
+                <Gift size={15} />
+                <div>
+                  <b>Tặng quà để kéo dây</b>
+                  <span>Send gifts to pull the rope</span>
+                </div>
+              </div>
+              <div className="pml-wait-row">
+                <Heart size={15} fill="currentColor" />
+                <div>
+                  <b>100 tim = +10 giây kéo</b>
+                  <span>100 likes = +10s pulling time</span>
+                </div>
+              </div>
+              <div className="pml-wait-go"><Hand size={16} /> Chạm màn hình để bắt đầu · Tap screen to start!</div>
               {s?.pendingJoins > 0 && <div className="pml-wait-sub"><Hourglass size={13} /> {s.pendingJoins} bạn đang chờ vào đội</div>}
             </div>
           </>
         )}
 
-        {/* ── Thắng màn / hòa: dải nhỏ ở dưới, sân 3D vẫn thấy rõ ── */}
+        {/* ── Thắng màn / hòa: dải nhỏ ở dưới, sân 3D vẫn thấy rõ.
+               Hết màn thì KHÔNG tự sang màn sau — streamer ấn bắt đầu mới
+               kéo màn sau (xem đủ người rồi ấn), nên dải ghi rõ như vậy. ── */}
         {phase === 'roundEnd' && s?.roundWinner && (
           <div className="pml-result-banner">
-            <TeamDot team={s.roundWinner} /> {teamLabel(s.roundWinner)} thắng màn {s.round}! · <TeamDot team="A" /> {teamA?.roundWins || 0} — {teamB?.roundWins || 0} <TeamDot team="B" /> · Màn {s.round + 1} sau {Math.max(0, Math.ceil(s.nextRoundIn || 0))}s…
+            <TeamDot team={s.roundWinner} /> {teamLabel(s.roundWinner)} thắng màn {s.round}! · <TeamDot team="A" /> {teamA?.roundWins || 0} — {teamB?.roundWins || 0} <TeamDot team="B" /> · Ấn bắt đầu để kéo màn {s.round + 1}!
           </div>
         )}
         {phase === 'roundEnd' && !s?.roundWinner && (
           <div className="pml-result-banner">
-            <Handshake size={15} /> Màn {s?.round} hòa! · Màn {s.round + 1} sau {Math.max(0, Math.ceil(s.nextRoundIn || 0))}s…
+            <Handshake size={15} /> Màn {s?.round} hòa! · Ấn bắt đầu để kéo màn {s.round + 1}!
           </div>
         )}
 
         {/* ── Vô địch trận: dải nhỏ ở dưới ── */}
         {phase === 'matchEnd' && s?.matchWinner && (
           <div className="pml-result-banner champion">
-            <Trophy size={15} /> {teamLabel(s.matchWinner).toUpperCase()} VÔ ĐỊCH! · <TeamDot team="A" /> {teamA?.roundWins || 0} — {teamB?.roundWins || 0} <TeamDot team="B" /> · <Gift size={14} /> {s?.stats?.gifts || 0} quà{(s?.streak?.[s.matchWinner] || 0) > 1 ? <> · <Flame size={14} /> Thắng {s.streak[s.matchWinner]} trận liên tiếp!</> : ''} · Trận mới sau {Math.max(0, Math.ceil(s.matchEndIn || 0))}s…
+            <Trophy size={15} /> {teamLabel(s.matchWinner).toUpperCase()} VÔ ĐỊCH! · <TeamDot team="A" /> {teamA?.roundWins || 0} — {teamB?.roundWins || 0} <TeamDot team="B" /> · <Gift size={14} /> {s?.stats?.gifts || 0} quà{(s?.streak?.[s.matchWinner] || 0) > 1 ? <> · <Flame size={14} /> Thắng {s.streak[s.matchWinner]} trận liên tiếp!</> : ''} · Ấn bắt đầu để chơi trận mới!
           </div>
         )}
 

@@ -235,6 +235,10 @@ export function createMatch(settings = DEFAULT_SETTINGS) {
     // 2 tỉnh đang đấu (mã tỉnh cho đội A/B; null = chưa đủ 2 tỉnh → đội Đỏ/Xanh thường).
     provinceTeams: { A: null, B: null },
     nextRoundIn: 0, matchEndIn: 0,
+    // Chờ streamer ấn bắt đầu màn sau: true = đang chờ bắt đầu màn tiếp
+    // theo của trận đang đấu (hết màn thì hiện bảng hướng dẫn, streamer
+    // xem đủ người rồi ấn bắt đầu); false = chờ bắt đầu trận mới.
+    waitingNextRound: false,
     // Camera quay cận khi có quà to (≥25 lực): { teamId, at } — đội được
     // tặng + lúc tặng (theo state.now, giây); null = không quay.
     giftCam: null,
@@ -631,6 +635,8 @@ export function startMatch(state) {
 
 export function startRound(state) {
   state.rope = 0
+  // Đã bắt đầu màn (streamer ấn hoặc demo tự ấn) thì hết trạng thái chờ.
+  state.waitingNextRound = false
   if (state.luckyStar) {
     // Đội thắng màn trước được bắt đầu màn sau lệch 0,12 về phía mình.
     state.rope = state.luckyStar.team === 'A' ? 0.12 : -0.12
@@ -701,14 +707,21 @@ export function tick(state, dt) {
   if (state.phase === 'roundEnd') {
     state.nextRoundIn -= dt
     if (state.nextRoundIn <= 0) {
-      state.round++
-      startRound(state)
+      // Hết màn: KHÔNG tự sang màn sau nữa — về chờ, hiện bảng hướng
+      // dẫn, streamer xem đủ người rồi ấn bắt đầu mới kéo màn sau.
+      state.phase = 'waiting'
+      state.waitingNextRound = true
     }
     return
   }
   if (state.phase === 'matchEnd') {
     state.matchEndIn -= dt
-    if (state.matchEndIn <= 0) startMatch(state)
+    if (state.matchEndIn <= 0) {
+      // Hết trận: KHÔNG tự bắt đầu trận mới — về chờ, streamer xem đủ
+      // người rồi ấn bắt đầu trận mới.
+      state.phase = 'waiting'
+      state.waitingNextRound = false
+    }
     return
   }
   if (state.phase !== 'pulling') return
