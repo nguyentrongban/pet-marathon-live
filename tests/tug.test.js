@@ -1029,6 +1029,35 @@ await asyncTest('mặc định TẮT giọng AI FPT: chỉ dùng giọng máy, k
   }
 })
 
+await asyncTest('không có giọng Việt thì không đặt lang vi-VN (iPhone sẽ nuốt câu đọc)', async () => {
+  const utterances = []
+  globalThis.window = {
+    Audio: class { constructor() { this.src = '' } play() { return Promise.resolve() } pause() {} },
+    speechSynthesis: {
+      getVoices: () => [{ lang: 'en-US', name: 'Samantha' }],
+      speak(u) { utterances.push(u); setTimeout(() => { if (u.onend) u.onend() }, 0) },
+      cancel() {},
+    },
+  }
+  globalThis.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; this.lang = ''; this.rate = 1 } }
+  const origFetch = globalThis.fetch
+  try {
+    const v = new VoiceEngine({ apiBase: 'https://api.test' })
+    const info = v.getVoiceInfo()
+    assert.equal(info.count, 1, 'máy có 1 giọng')
+    assert.equal(info.hasVi, false, 'không có giọng Việt')
+    v.speak('Kiểm tra giọng mặc định!', 'high')
+    await waitIdle(v)
+    const mine = utterances.find((u) => u.text.includes('Kiểm tra giọng mặc định'))
+    assert.ok(mine, 'phải đọc câu thử')
+    assert.notEqual(mine.lang, 'vi-VN', 'không có giọng Việt thì không được đặt lang vi-VN')
+    assert.equal(mine.voice, undefined, 'không có giọng Việt thì không gán voice')
+  } finally {
+    globalThis.fetch = origFetch
+    unmockBrowser()
+  }
+})
+
 
 console.log('\n🪢 KÉO CO LIVE — test logic kéo co (luật v2: số đông vs quà, tim = giờ)')
 for (const line of results) console.log(line)

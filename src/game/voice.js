@@ -211,6 +211,18 @@ export class VoiceEngine {
     })
   }
 
+  // Thông tin giọng máy trên thiết bị (để chẩn đoán: máy có giọng nào không,
+  // có giọng tiếng Việt không). Trả { count, hasVi, viName }.
+  getVoiceInfo() {
+    try {
+      const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
+      if (!synth) return { count: 0, hasVi: false, viName: '' }
+      const voices = synth.getVoices ? synth.getVoices() : []
+      const vi = voices.find((v) => (v.lang || '').toLowerCase().startsWith('vi'))
+      return { count: voices.length, hasVi: !!vi, viName: vi ? (vi.name || 'tiếng Việt') : '' }
+    } catch { return { count: 0, hasVi: false, viName: '' } }
+  }
+
   async speakDevice(text) {
     try {
       const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
@@ -240,11 +252,14 @@ export class VoiceEngine {
         })
       }
       const utter = new SpeechSynthesisUtterance(text)
-      utter.lang = 'vi-VN'
       utter.rate = 1
-      // Ưu tiên giọng tiếng Việt có sẵn trên máy (iPhone có sẵn giọng Việt).
+      // Chỉ đặt lang/voice tiếng Việt khi máy THẬT SỰ có giọng Việt. Nếu máy
+      // chưa có giọng Việt mà vẫn đặt lang='vi-VN' thì iPhone sẽ nuốt luôn
+      // câu đọc (không đọc, không báo lỗi) — đây là lỗi khiến máy im lặng
+      // hoàn toàn. Không có giọng Việt thì đọc bằng giọng mặc định của máy
+      // (nghe được, chỉ là phát âm chưa chuẩn).
       const vi = voices.find((v) => (v.lang || '').toLowerCase().startsWith('vi'))
-      if (vi) utter.voice = vi
+      if (vi) { utter.lang = vi.lang || 'vi-VN'; utter.voice = vi }
       // Nếu còn 1 câu kẹt trong máy (nói dở rồi dừng) thì hủy nó trước,
       // không thì câu mới xếp sau câu kẹt và không bao giờ đọc. Hủy xong
       // chờ 100ms rồi mới đọc (iPhone: hủy rồi đọc ngay là câu mới bị nuốt).

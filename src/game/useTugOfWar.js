@@ -651,10 +651,22 @@ export function useTugOfWar() {
 
   // Thử giọng ngay trên tab màn hình này: cử chỉ chạm ở đây mở khóa âm
   // thanh cho tab này — bấm thử trong Admin thì tab màn hình không có cử
-  // chỉ nên iPhone chặn, nghe không thấy gì.
+  // chỉ nên iPhone chặn, nghe không thấy gì. Bấm xong hiện toast báo trạng
+  // thái giọng máy (mấy giọng / có tiếng Việt không) để chẩn đoán.
   const testVoice = useCallback(() => {
+    const info = voiceRef.current?.getVoiceInfo?.() || null
     voiceRef.current?.speakDeviceTest('Hà Nội đang dẫn đầu, thử giọng đọc bình luận!')
-  }, [])
+    const s = stateRef.current
+    if (info) {
+      const msg = info.count === 0
+        ? '🔇 Máy chưa tải được giọng đọc nào — thử lại sau vài giây.'
+        : info.hasVi
+          ? `🔊 Đang đọc thử bằng giọng ${info.viName}…`
+          : `🔊 Đang đọc thử bằng giọng mặc định của máy (chưa có tiếng Việt).`
+      pushToast(s, msg)
+      takeSnap()
+    }
+  }, [takeSnap])
 
   return {
     stateRef, snap, wsStatus, wsDetail, wsLog, muted,
