@@ -1472,10 +1472,17 @@ export default function TugScene({ liveRef }) {
         // Đội Đỏ nhìn về +X, đội Xanh nhìn về -X — camera đứng chếch về
         // phía mặt họ (hướng về giữa sân + hơi lệch ra trước) để thấy mặt
         // lúc quay cận. Người kéo theo dây (smoothRopeX) nên cộng vào.
+        // Quà to thì cam lại gần + thấp hơn (khác biệt, đẹp hơn, gần mặt
+        // hơn để thấy rõ cảm xúc) — quà nhỏ thì giữ khoảng cách thường.
         const dir = giftCam.teamId === 'A' ? 1 : -1
         const mx = spot.x + smoothRopeX
-        tmpCamPos.set(mx + dir * 2.2, 2.0, spot.z + 4.2)
-        tmpLook.set(mx, 1.3, spot.z)
+        if (giftCam.big) {
+          tmpCamPos.set(mx + dir * 1.8, 1.7, spot.z + 3.2)
+          tmpLook.set(mx, 1.2, spot.z)
+        } else {
+          tmpCamPos.set(mx + dir * 2.2, 2.0, spot.z + 4.2)
+          tmpLook.set(mx, 1.3, spot.z)
+        }
       } else if ((phase === 'roundEnd' || phase === 'matchEnd') && loserTeam) {
         const endElapsed = now - roundEndStart
         if (endElapsed < 4) {

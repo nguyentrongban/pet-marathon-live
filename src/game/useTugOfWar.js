@@ -193,6 +193,8 @@ export function useTugOfWar() {
       // Đấu tỉnh thành: 2 tỉnh đang đấu + top tỉnh theo số người bình luận.
       provinceTeams: { ...s.provinceTeams },
       provinceBattle: topProvincesByComments(s, 2),
+      // Camera quà: App đọc giftCam để hiện bùn dính ống kính khi quà to.
+      giftCam: s.giftCam ? { ...s.giftCam } : null,
       queueLength: engineRef.current.queueLength,
       settings: s.settings,
       voiceMode: voiceRef.current ? voiceRef.current.getMode() : 'device',

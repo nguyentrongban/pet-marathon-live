@@ -565,11 +565,19 @@ export function applyPull(state, teamId, power, sender = {}, giftName = '', opts
       province: pv || null, provinceBonus,
     })
   }
-  // Quà to (≥25 lực) mà là quà THẬT: camera quay cận từng người của đội
-  // được tặng (từ trước ra sau) rồi trượt về toàn cảnh — TugScene đọc
-  // state.giftCam để quay. Quà thử (Admin/demo) không quay.
-  if (big && opts.gift !== false) {
-    state.giftCam = { teamId, at: state.now }
+  // Camera quay cận: MỌI quà thật (kể cả 1 xu) đều quay cận từng người
+  // của đội được tặng — quà to (≥25) thì quay cận đẹp hơn + bùn dính ống
+  // kính (xem TugScene/App). Quà thử (Admin/demo) không quay.
+  // Cùng đội đang quay cận mà có quà mới tới thì KHÔNG quay lại từ đầu
+  // (để màn quay trước→sau chạy hết); chỉ nâng lên quà to nếu quà mới to.
+  if (opts.gift !== false) {
+    const cur = state.giftCam
+    const giftAge = cur ? state.now - cur.at : 99
+    if (!cur || cur.teamId !== teamId || giftAge >= 3.6) {
+      state.giftCam = { teamId, at: state.now, big }
+    } else if (big && !cur.big) {
+      cur.big = true
+    }
   }
   return { ok: true, teamId, effect, comeback: losing, final, flip, province: pv, provinceBonus }
 }

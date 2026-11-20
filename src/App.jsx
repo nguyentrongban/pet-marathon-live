@@ -81,6 +81,13 @@ function DisplayGame() {
   const toastFx = (s?.effects || []).filter((e) => e.kind === 'toast').pop()
   const giftFx = (s?.effects || []).filter((e) => e.kind === 'gift').pop()
   const giftProvince = giftFx?.province ? provinceInfo(giftFx.province) : null
+  // Bùn dính ống kính (quà to): camera quay cận quà to thì bùn bắn dính lên
+  // ống kính cho thật — hiện lúc quà to vừa tặng, mờ dần trong ~4 giây.
+  // Opacity tính theo tuổi giftCam (snapshot cập nhật mỗi ~200ms) để mờ dần
+  // mượt mà, không dùng animation mờ dần ở container (dễ kẹt opacity).
+  const giftCamAge = s?.giftCam ? (s.now ?? 0) - s.giftCam.at : 99
+  const mudLens = s?.giftCam?.big && giftCamAge >= 0 && giftCamAge < 4
+  const mudOpacity = mudLens ? (giftCamAge < 3 ? 1 : Math.max(0, 4 - giftCamAge)) : 0
   const bxh = s?.bxh || { gifters: [], likers: [] }
   const provinces = bxh.provinces || []
   const hasBxh = (bxh.gifters?.length || 0) > 0 || (bxh.likers?.length || 0) > 0 || provinces.length > 0
@@ -223,6 +230,25 @@ function DisplayGame() {
               <div className="fw-sub">tặng {giftFx.gift || 'quà to'} · <Zap size={14} /> {Math.round(giftFx.power)} lực kéo!</div>
               {giftProvince && <div className="fw-province"><MapPin size={15} /> {giftProvince.name}{giftFx.provinceBonus ? ' · Tỉnh dẫn đầu ×1,5!' : ''}</div>}
             </div>
+          </div>
+        )}
+
+        {/* ── Bùn dính ống kính (quà to) ──
+             Quà to thì camera quay cận + bùn bắn dính lên ống kính cho thật:
+             vệt bùn to ở góc + giọt bùn nhỏ văng quanh, hơi mờ (bùn dính
+             sát ống kính nên nhòe), mờ dần trong ~4 giây rồi hết. */}
+        {mudLens && (
+          <div className="pml-mudlens" style={{ opacity: mudOpacity }}>
+            <div className="pml-mudlens-vignette" />
+            <span className="pml-mudblob pml-mud-1" />
+            <span className="pml-mudblob pml-mud-2" />
+            <span className="pml-mudblob pml-mud-3" />
+            <span className="pml-muddrop pml-mud-d1" />
+            <span className="pml-muddrop pml-mud-d2" />
+            <span className="pml-muddrop pml-mud-d3" />
+            <span className="pml-muddrop pml-mud-d4" />
+            <span className="pml-muddrop pml-mud-d5" />
+            <span className="pml-muddrop pml-mud-d6" />
           </div>
         )}
 

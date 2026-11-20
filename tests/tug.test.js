@@ -600,19 +600,21 @@ test('quà đi qua GiftEngine vẫn mang tên quà sang hiệu ứng', () => {
   assert.equal(fx.big, true, 'hạc giấy 100 lực là quà to')
 })
 
-// ── 15b. Camera quà to: quay cận từng người đội được tặng ─────────────────
-test('quà to thật (≥25) thì đặt giftCam cho đội được tặng', () => {
+// ── 15b. Camera quà: MỌI quà thật đều quay cận, quà to thì đẹp hơn ──────
+test('quà to thật (≥25) thì đặt giftCam cho đội được tặng, cờ big=true', () => {
   const s = freshMatch()
   assert.equal(s.giftCam, null, 'ban đầu không quay cận')
   const r = applyPull(s, 'A', 25, { nickname: 'Lan', userId: 'lan' }, 'Nước hoa')
   assert.equal(r.ok, true)
-  assert.deepEqual(s.giftCam, { teamId: 'A', at: 10 }, 'ghi đội A + lúc tặng (state.now)')
+  assert.deepEqual(s.giftCam, { teamId: 'A', at: 10, big: true }, 'ghi đội A + lúc tặng (state.now) + quà to')
 })
 
-test('quà nhỏ (<25) thì không quay cận', () => {
+test('quà nhỏ thật (1 xu) cũng quay cận, cờ big=false', () => {
   const s = freshMatch()
-  applyPull(s, 'A', 10, { nickname: 'Lan', userId: 'lan' }, 'Cỏ bốn lá')
-  assert.equal(s.giftCam, null)
+  applyPull(s, 'A', 1, { nickname: 'Lan', userId: 'lan' }, 'Hoa hồng')
+  assert.deepEqual(s.giftCam, { teamId: 'A', at: 10, big: false }, 'quà 1 xu cũng quay cận (không phải quà to)')
+  applyPull(s, 'B', 10, { nickname: 'Minh', userId: 'minh' }, 'Cỏ bốn lá')
+  assert.deepEqual(s.giftCam, { teamId: 'B', at: 10, big: false }, 'đội khác thì quay đội mới')
 })
 
 test('quà thử (Admin/demo, gift:false) thì không quay cận', () => {
@@ -621,12 +623,28 @@ test('quà thử (Admin/demo, gift:false) thì không quay cận', () => {
   assert.equal(s.giftCam, null)
 })
 
-test('quà to sau thì ghi đè đội/lúc tặng mới', () => {
+test('cùng đội đang quay cận mà có quà mới thì không quay lại từ đầu', () => {
+  const s = freshMatch()
+  applyPull(s, 'A', 1, { nickname: 'Lan', userId: 'lan' }, 'Hoa hồng')
+  s.now = 11
+  applyPull(s, 'A', 5, { nickname: 'Hoa', userId: 'hoa' }, 'Quả đào')
+  assert.deepEqual(s.giftCam, { teamId: 'A', at: 10, big: false }, 'giữ nguyên lúc bắt đầu quay, không reset')
+})
+
+test('đang quay cận quà nhỏ mà có quà to cùng đội thì nâng lên quà to, không reset', () => {
+  const s = freshMatch()
+  applyPull(s, 'A', 1, { nickname: 'Lan', userId: 'lan' }, 'Hoa hồng')
+  s.now = 11
+  applyPull(s, 'A', 100, { nickname: 'Minh', userId: 'minh' }, 'Hạc giấy')
+  assert.deepEqual(s.giftCam, { teamId: 'A', at: 10, big: true }, 'nâng big=true để thêm bùn dính ống kính, giữ nguyên at')
+})
+
+test('quà to sau (đội khác) thì ghi đè đội/lúc tặng mới', () => {
   const s = freshMatch()
   applyPull(s, 'A', 25, { nickname: 'Lan', userId: 'lan' }, 'Nước hoa')
   s.now = 20
   applyPull(s, 'B', 100, { nickname: 'Minh', userId: 'minh' }, 'Hạc giấy')
-  assert.deepEqual(s.giftCam, { teamId: 'B', at: 20 })
+  assert.deepEqual(s.giftCam, { teamId: 'B', at: 20, big: true })
 })
 
 // ── 16. Toast: ai vào xem / theo dõi / chia sẻ hiện 2 giây rồi mất ────────
