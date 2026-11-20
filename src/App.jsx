@@ -253,12 +253,18 @@ function DisplayGame() {
             <span className="pml-mudblob pml-mud-1" />
             <span className="pml-mudblob pml-mud-2" />
             <span className="pml-mudblob pml-mud-3" />
+            <span className="pml-mudblob pml-mud-4" />
+            <span className="pml-mudblob pml-mud-5" />
             <span className="pml-muddrop pml-mud-d1" />
             <span className="pml-muddrop pml-mud-d2" />
             <span className="pml-muddrop pml-mud-d3" />
             <span className="pml-muddrop pml-mud-d4" />
             <span className="pml-muddrop pml-mud-d5" />
             <span className="pml-muddrop pml-mud-d6" />
+            <span className="pml-muddrop pml-mud-d7" />
+            <span className="pml-muddrop pml-mud-d8" />
+            <span className="pml-muddrop pml-mud-d9" />
+            <span className="pml-muddrop pml-mud-d10" />
           </div>
         )}
 
