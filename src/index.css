@@ -194,7 +194,7 @@ input, select { font-family: inherit; }
 .pml-mudlens { position: absolute; inset: 0; z-index: 5; pointer-events: none; overflow: hidden; }
 .pml-mudlens-vignette {
   position: absolute; inset: 0;
-  background: radial-gradient(ellipse at center, transparent 35%, rgba(74, 44, 18, .55) 100%);
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(74, 44, 18, .55) 100%);
 }
 .pml-mudblob {
   position: absolute; display: block;
@@ -204,12 +204,14 @@ input, select { font-family: inherit; }
 }
 /* Bùn dính ống kính TO — quà to là bùn bắn tung tóe che gần hết khung hình
    cho hài (người tặng quà "che" màn hình không cho người khác xem), chỉ
-   chừa 1 ô nhỏ ở giữa để còn hé thấy trận đấu. Bùn mờ dần trong ~4 giây. */
+   chừa 1 ô nhỏ ở giữa để còn hé thấy trận đấu. Bùn mờ dần trong ~4 giây.
+   Vệt bùn số 5 để ở mép trái (không đè lên giữa) để tên + avatar trên đầu
+   nhân vật lúc camera quay cận vẫn nhìn thấy được. */
 .pml-mud-1 { width: 230px; height: 190px; left: -45px; top: 6%; transform: rotate(-18deg); }
 .pml-mud-2 { width: 210px; height: 170px; right: -35px; bottom: 12%; transform: rotate(24deg); border-radius: 55% 45% 40% 60% / 45% 60% 40% 55%; }
 .pml-mud-3 { width: 180px; height: 140px; left: -25px; bottom: 6%; transform: rotate(10deg); }
 .pml-mud-4 { width: 160px; height: 130px; right: -30px; top: 32%; transform: rotate(-12deg); border-radius: 60% 40% 55% 45% / 40% 55% 45% 60%; }
-.pml-mud-5 { width: 140px; height: 110px; left: 30%; top: 42%; transform: rotate(30deg); }
+.pml-mud-5 { width: 140px; height: 110px; left: -30px; top: 58%; transform: rotate(30deg); }
 .pml-muddrop {
   position: absolute; display: block; border-radius: 50%;
   background: radial-gradient(circle at 35% 35%, #6b4423, #4a2c12 75%);

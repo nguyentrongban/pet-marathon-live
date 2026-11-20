@@ -1474,23 +1474,42 @@ export default function TugScene({ liveRef }) {
       const sway = Math.sin(time * 0.15) * 0.25
       const giftCam = st.giftCam
       const giftAge = giftCam ? now - giftCam.at : -1
+      // Tốc độ trượt camera: mặc định 2,2; camera quà phải tới nơi
+      // nhanh trong mỗi đoạn 1,2s (không thì hết đoạn vẫn còn đang
+      // trượt, nhân vật trôi ngang khung hình, avatar lệch ra mép).
+      let camDamp = 2.2
       if (phase === 'pulling' && giftCam && giftAge >= 0 && giftAge < GIFT_CAM_SECONDS) {
-        const spots = TEAM_SPOTS[giftCam.teamId] || TEAM_SPOTS.A
-        const idx = Math.min(spots.length - 1, Math.floor(giftAge / GIFT_CAM_SEG))
+        // Avatar (tên + ảnh đại diện) CHỈ có trên nhân vật KHÁN GIẢ
+        // (VIEWER_SPOTS); người mẫu (TEAM_SPOTS) không có bảng tên.
+        // Quay cận TEAM_SPOTS nên avatar toàn nằm lệch ra mép khung
+        // hình, bị mép màn hình + vệt bùn che mất (tấn báo 2026-11-20).
+        // Đội có khán giả thì quay VIEWER_SPOTS để avatar vào giữa
+        // khung (chỉ quay đúng số khán giả đang hiện, khỏi quay chỗ
+        // trống); chưa có ai vào đội thì giữ TEAM_SPOTS (quay người mẫu).
+        const viewerCount = visibleMembers(st, giftCam.teamId, VIEWER_CAP).length
+        const spots = viewerCount > 0
+          ? (VIEWER_SPOTS[giftCam.teamId] || VIEWER_SPOTS.A)
+          : (TEAM_SPOTS[giftCam.teamId] || TEAM_SPOTS.A)
+        const spotCount = viewerCount > 0 ? viewerCount : spots.length
+        const idx = Math.min(spotCount - 1, Math.floor(giftAge / GIFT_CAM_SEG))
+        camDamp = 6
         const spot = spots[idx]
         // Đội Đỏ nhìn về +X, đội Xanh nhìn về -X — camera đứng chếch về
         // phía mặt họ (hướng về giữa sân + hơi lệch ra trước) để thấy mặt
         // lúc quay cận. Người kéo theo dây (smoothRopeX) nên cộng vào.
         // Quà to thì cam lại gần + thấp hơn (khác biệt, đẹp hơn, gần mặt
         // hơn để thấy rõ cảm xúc) — quà nhỏ thì giữ khoảng cách thường.
+        // Ngắm cao (y=1,7, ngang đầu) để tên + avatar trên đầu nhân vật
+        // lọt vào giữa khung hình (ô trống của bùn dính ống kính) — ngắm
+        // thấp (ngang hông) thì avatar bị đẩy lên mép trên, bùn che mất.
         const dir = giftCam.teamId === 'A' ? 1 : -1
         const mx = spot.x + smoothRopeX
         if (giftCam.big) {
           tmpCamPos.set(mx + dir * 1.8, 1.7, spot.z + 3.2)
-          tmpLook.set(mx, 1.2, spot.z)
+          tmpLook.set(mx, 1.7, spot.z)
         } else {
           tmpCamPos.set(mx + dir * 2.2, 2.0, spot.z + 4.2)
-          tmpLook.set(mx, 1.3, spot.z)
+          tmpLook.set(mx, 1.7, spot.z)
         }
       } else if ((phase === 'roundEnd' || phase === 'matchEnd') && loserTeam) {
         const endElapsed = now - roundEndStart
@@ -1514,8 +1533,8 @@ export default function TugScene({ liveRef }) {
         tmpCamPos.set(camBase.x + sway, camBase.y, camBase.z + Math.abs(rope) * 1.5)
         tmpLook.copy(lookTarget)
       }
-      curCamPos.lerp(tmpCamPos, damp(2.2))
-      curLook.lerp(tmpLook, damp(2.2))
+      curCamPos.lerp(tmpCamPos, damp(camDamp))
+      curLook.lerp(tmpLook, damp(camDamp))
       camera.position.set(
         curCamPos.x + (Math.random() - 0.5) * shake,
         curCamPos.y + (Math.random() - 0.5) * shake * 0.6,
