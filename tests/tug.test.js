@@ -893,7 +893,7 @@ test('nút Thử giọng đọc: force=true thì đọc kể cả khi đang tắ
 test('unlock() không lỗi khi không có window (chạy test node)', () => {
   const v = new VoiceEngine({ apiBase: '' })
   v.unlock()
-  assert.equal(v._warmedUp, false, 'không có giọng máy thì chưa mở khóa')
+  assert.equal(v.getMode(), 'device', 'không có API thì mặc định giọng máy')
 })
 
 test('câu y hệt vừa đọc trong 3 giây thì không đọc lặp', () => {
@@ -946,7 +946,7 @@ await asyncTest('FPT.AI lỗi (hết lượt) → tự chuyển giọng máy mi�
   globalThis.fetch = async () => ({ ok: true, json: async () => ({ ok: false, error: 'fpt-error' }) })
   try {
     const modes = []
-    const v = new VoiceEngine({ apiBase: 'https://api.test', onModeChange: (m) => modes.push(m) })
+    const v = new VoiceEngine({ apiBase: 'https://api.test', useFpt: true, onModeChange: (m) => modes.push(m) })
     assert.equal(v.getMode(), 'fpt')
     // Các engine ở test đồng bộ trước đó còn chạy ngầm — câu của chúng chỉ
     // đọc khi tới lượt await đầu tiên (sau khi mock được gắn), nên không
@@ -978,7 +978,7 @@ await asyncTest('hết 5 phút nghỉ thì thử lại FPT.AI, được thì n�
   const origFetch = globalThis.fetch
   try {
     const modes = []
-    const v = new VoiceEngine({ apiBase: 'https://api.test', onModeChange: (m) => modes.push(m) })
+    const v = new VoiceEngine({ apiBase: 'https://api.test', useFpt: true, onModeChange: (m) => modes.push(m) })
     // Giả vờ vừa lỗi xong: đang ở giọng máy, 5 phút nghỉ đã hết.
     v.mode = 'device'
     v.fptCooldownUntil = Date.now() - 1
@@ -1005,6 +1005,24 @@ await asyncTest('thử giọng máy trực tiếp: deviceOnly thì bỏ qua FPT.
     await waitIdle(v)
     assert.equal(fetchCalls, 0, 'thử giọng máy thì không gọi FPT.AI')
     assert.ok(spoken.some((t) => t.includes('thử giọng máy trực tiếp')), 'đọc ngay bằng giọng máy')
+  } finally {
+    globalThis.fetch = origFetch
+    unmockBrowser()
+  }
+})
+
+await asyncTest('mặc định TẮT giọng AI FPT: chỉ dùng giọng máy, không gọi mạng', async () => {
+  const spoken = mockBrowser()
+  const origFetch = globalThis.fetch
+  try {
+    let fetchCalls = 0
+    globalThis.fetch = async () => { fetchCalls++; throw new Error('no network') }
+    const v = new VoiceEngine({ apiBase: 'https://api.test' })
+    assert.equal(v.getMode(), 'device', 'mặc định là giọng máy (FPT.AI tắt)')
+    v.speak('Hà Nội đang dẫn đầu!', 'high')
+    await waitIdle(v)
+    assert.equal(fetchCalls, 0, 'không gọi FPT.AI khi đã tắt')
+    assert.ok(spoken.some((t) => t.includes('Hà Nội đang dẫn đầu')), 'đọc bằng giọng máy')
   } finally {
     globalThis.fetch = origFetch
     unmockBrowser()

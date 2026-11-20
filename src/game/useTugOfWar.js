@@ -136,6 +136,9 @@ export function useTugOfWar() {
       // Giọng đọc chỉ theo nút voiceOn trong Admin — KHÔNG theo nút tắt
       // tiếng trên màn hình (nút đó chỉ tắt nhạc hiệu ứng). Trước đây giọng
       // đọc tắt theo tiếng nên streamer tắt tiếng là mất luôn giọng đọc.
+      // Giọng AI FPT.AI TẮT hẳn (useFpt: false) theo yêu cầu của tấn 23:47
+      // — chỉ dùng giọng máy miễn phí trên điện thoại.
+      useFpt: false,
       enabled: settings0.voiceOn !== false,
       onModeChange: (mode) => {
         if (mode === 'device') logWs('🎙️ Hết lượt / lỗi giọng FPT.AI — đang dùng giọng máy miễn phí, thử lại sau 5 phút.')

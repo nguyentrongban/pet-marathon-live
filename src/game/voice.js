@@ -1,8 +1,8 @@
 // ─── KÉO CO LIVE · voice.js ────────────────────────────────────────────────
-// Giọng đọc bình luận: tặng quà / thắng màn / BXH — đọc bằng giọng FPT.AI
-// (Ban Mai nữ miền Bắc mặc định, đổi được trong Admin), hết lượt miễn phí
-// hoặc lỗi mạng thì TỰ CHUYỂN sang giọng máy miễn phí trên điện thoại
-// (speechSynthesis, tiếng Việt) rồi thử lại FPT.AI sau 5 phút.
+// Giọng đọc bình luận: tặng quà / thắng màn / BXH — đọc bằng GIỌNG MÁY miễn
+// phí trên điện thoại (speechSynthesis, tiếng Việt). Giọng AI FPT.AI (Ban
+// Mai) ĐANG TẮT theo yêu cầu của tấn (23:47) — code FPT.AI vẫn còn nguyên,
+// bật lại bằng cách truyền useFpt: true cho VoiceEngine.
 // Hàng đợi có ưu tiên: thắng trận > quà to / BXH > quà nhỏ; đầy thì bỏ
 // câu ưu tiên thấp nhất. Không bao giờ đọc chồng lên nhau.
 
@@ -45,7 +45,7 @@ export function voiceTextBxh(province, gifter) {
 }
 
 export class VoiceEngine {
-  constructor({ apiBase = '', voice = 'banmai', enabled = true, onModeChange = null } = {}) {
+  constructor({ apiBase = '', voice = 'banmai', enabled = true, onModeChange = null, useFpt = false } = {}) {
     this.apiBase = String(apiBase || '').replace(/\/$/, '')
     this.voice = VOICE_IDS.has(voice) ? voice : 'banmai'
     this.enabled = enabled !== false
@@ -53,13 +53,14 @@ export class VoiceEngine {
     this.queue = []
     this.speaking = false
     this.audio = null
-    // Chế độ đang dùng: 'fpt' (giọng FPT.AI) hay 'device' (giọng máy miễn
-    // phí). Chưa có địa chỉ API thì mặc định giọng máy (không gọi FPT.AI).
-    this.mode = this.apiBase ? 'fpt' : 'device'
+    // Giọng AI FPT.AI TẮT mặc định (theo yêu cầu của tấn 23:47 — chỉ dùng
+    // giọng máy trên điện thoại). Muốn bật lại Ban Mai thì truyền
+    // useFpt: true. Chế độ đang dùng: 'fpt' hay 'device' (giọng máy).
+    this.useFpt = useFpt === true
+    this.mode = (this.useFpt && this.apiBase) ? 'fpt' : 'device'
     this.fptCooldownUntil = 0
     this.lastSpokenText = ''
     this.lastSpokenAt = 0
-    this._warmedUp = false
   }
 
   getMode() { return this.mode }
@@ -73,20 +74,10 @@ export class VoiceEngine {
 
   unlock() {
     // Đánh thức giọng máy để lần đọc đầu không bị trễ (iPhone tải giọng chậm).
+    // Chỉ gọi getVoices() — KHÔNG đọc câu câm mở khóa nữa: câu câm đó có thể
+    // kẹt trong hàng đợi giọng máy rồi làm câu thật sau đó không đọc được.
     try {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.getVoices()
-        // iPhone: chỉ gọi getVoices() thì chưa đủ — phải gọi speak() 1 lần
-        // trong lúc chạm thì lần đọc sau mới có tiếng. Đọc 1 câu câm (âm
-        // lượng 0) để mở khóa mà không phát ra tiếng.
-        if (!this._warmedUp) {
-          this._warmedUp = true
-          const u = new SpeechSynthesisUtterance('a')
-          u.lang = 'vi-VN'
-          u.volume = 0
-          window.speechSynthesis.speak(u)
-        }
-      }
+      if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.getVoices()
     } catch { /* ignore */ }
   }
 
@@ -150,9 +141,10 @@ export class VoiceEngine {
   }
 
   async playItem(item) {
-    // Thử FPT.AI trước (trừ khi đang trong 5 phút nghỉ sau lỗi/hết lượt,
-    // hoặc câu này chỉ định đọc bằng giọng máy).
-    if (!item.deviceOnly && (this.mode === 'fpt' || Date.now() >= this.fptCooldownUntil)) {
+    // Giọng AI FPT.AI đang TẮT (useFpt=false) → đi thẳng giọng máy. Khi nào
+    // bật lại useFpt thì mới thử FPT.AI trước (trừ khi đang trong 5 phút
+    // nghỉ sau lỗi/hết lượt, hoặc câu này chỉ định đọc bằng giọng máy).
+    if (this.useFpt && !item.deviceOnly && (this.mode === 'fpt' || Date.now() >= this.fptCooldownUntil)) {
       const url = await this.fetchFptAudio(item.text)
       if (url) {
         const played = await this.playAudio(url)
@@ -219,19 +211,50 @@ export class VoiceEngine {
     })
   }
 
-  speakDevice(text) {
-    return new Promise((resolve) => {
-      try {
-        const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
-        if (!synth) return resolve(false)
-        const utter = new SpeechSynthesisUtterance(text)
-        utter.lang = 'vi-VN'
-        utter.rate = 1
-        // Ưu tiên giọng tiếng Việt có sẵn trên máy (iPhone có sẵn giọng Việt).
-        const voices = synth.getVoices ? synth.getVoices() : []
-        const vi = voices.find((v) => (v.lang || '').toLowerCase().startsWith('vi'))
-        if (vi) utter.voice = vi
+  async speakDevice(text) {
+    try {
+      const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
+      if (!synth) return false
+      // iPhone: getVoices() ban đầu trả về rỗng (giọng chưa tải xong) — gọi
+      // speak() lúc này là mất tiếng luôn. Đợi giọng tải xong (tối đa 2s)
+      // rồi mới đọc.
+      let voices = synth.getVoices ? synth.getVoices() : []
+      if (!voices.length) {
+        voices = await new Promise((resolve) => {
+          let done = false
+          const finish = () => {
+            if (done) return
+            done = true
+            try {
+              if (synth.removeEventListener) synth.removeEventListener('voiceschanged', onChange)
+              else synth.onvoiceschanged = null
+            } catch { /* ignore */ }
+            resolve(synth.getVoices ? synth.getVoices() : [])
+          }
+          const onChange = () => finish()
+          try {
+            if (synth.addEventListener) synth.addEventListener('voiceschanged', onChange)
+            else synth.onvoiceschanged = onChange
+          } catch { /* ignore */ }
+          setTimeout(finish, 2000)
+        })
+      }
+      const utter = new SpeechSynthesisUtterance(text)
+      utter.lang = 'vi-VN'
+      utter.rate = 1
+      // Ưu tiên giọng tiếng Việt có sẵn trên máy (iPhone có sẵn giọng Việt).
+      const vi = voices.find((v) => (v.lang || '').toLowerCase().startsWith('vi'))
+      if (vi) utter.voice = vi
+      // Nếu còn 1 câu kẹt trong máy (nói dở rồi dừng) thì hủy nó trước,
+      // không thì câu mới xếp sau câu kẹt và không bao giờ đọc. Hủy xong
+      // chờ 100ms rồi mới đọc (iPhone: hủy rồi đọc ngay là câu mới bị nuốt).
+      if (synth.speaking || synth.pending) {
+        try { synth.cancel() } catch { /* ignore */ }
+        await new Promise((r) => setTimeout(r, 100))
+      }
+      return await new Promise((resolve) => {
         let done = false
+        let timeoutId = null
         const finish = (ok) => {
           if (done) return
           done = true
@@ -240,16 +263,13 @@ export class VoiceEngine {
         }
         utter.onend = () => finish(true)
         utter.onerror = () => finish(false)
-        // iPhone hay bị kẹt 1 câu đọc cũ (nói dở rồi dừng, câu sau không
-        // đọc được nữa) — hủy hết câu đang chờ trước khi đọc câu mới.
-        try { synth.cancel() } catch { /* ignore */ }
         synth.speak(utter)
         // An toàn: quá 30 giây chưa xong thì dừng (tránh kẹt hàng đợi).
-        const timeoutId = setTimeout(() => {
+        timeoutId = setTimeout(() => {
           try { synth.cancel() } catch { /* ignore */ }
           finish(false)
         }, 30000)
-      } catch { resolve(false) }
-    })
+      })
+    } catch { return false }
   }
 }
