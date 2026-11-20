@@ -17,7 +17,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 import { Sky } from 'three/addons/objects/Sky.js'
 import { clone as cloneModel } from 'three/addons/utils/SkeletonUtils.js'
 import { TEAMS, visibleMembers } from '../game/engine'
-import { provinceInfo } from '../game/provinces'
+import { regionInfo } from '../game/regions'
 
 // 6 người kéo — mỗi đội 3 người. Slot (team + vị trí) mới là khóa, vì 2 slot
 // có thể dùng chung 1 file model (Hương là bản đổi màu áo của Lan, Bình là
@@ -1101,10 +1101,19 @@ export default function TugScene({ liveRef }) {
             ctx.lineWidth = 3
             ctx.stroke()
             ctx.fillStyle = '#ffffff'
-            ctx.font = '900 40px sans-serif'
             ctx.textAlign = 'center'
             ctx.textBaseline = 'middle'
-            ctx.fillText(provinceInfo(c.code)?.short || c.code, 128, 50)
+            // Tên vùng trên bảng: tỉnh thì tên ngắn, nước thì cờ + tên ngắn.
+            // Co chữ lại nếu dài (cờ + tên nước dài) để vừa bảng 256px.
+            const info = regionInfo(c.code)
+            const label = info ? (info.flag ? `${info.flag} ${info.short}` : info.short) : c.code
+            let fs = 40
+            ctx.font = `900 ${fs}px sans-serif`
+            while (ctx.measureText(label).width > 220 && fs > 20) {
+              fs -= 2
+              ctx.font = `900 ${fs}px sans-serif`
+            }
+            ctx.fillText(label, 128, 50)
             slot.tex.needsUpdate = true
             slot.cloth.rotation.y = Math.sin(time * 2 + i) * 0.15
           })

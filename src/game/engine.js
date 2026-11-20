@@ -15,7 +15,7 @@
 // · Tỉnh thành: quà tính theo tỉnh của người tặng — tỉnh dẫn đầu được
 //   thưởng thêm lực kéo (×1,5) để khán giả tặng quà đưa tỉnh mình lên số 1.
 
-import { provinceInfo } from './provinces.js'
+import { regionInfo } from './regions.js'
 
 // ─── Người chơi + đội ───────────────────────────────────────────────────────
 // 6 người thật (model 3D): Đội Đỏ = Anh Hùng (lính), Kaito (võ sĩ), Mia;
@@ -304,25 +304,26 @@ export function recordProvinceGift(state, code, power, nickname = '') {
   state.provinceTotals[code] = cur
   return cur
 }
-// Top N tỉnh tặng quà nhiều nhất (theo tổng lực kéo từ quà của tỉnh đó).
+// Top N vùng (tỉnh/nước) tặng quà nhiều nhất (theo tổng lực kéo từ quà của vùng đó).
 export function topProvinces(state, n = 3) {
   return Object.values(state.provinceTotals || {})
     .sort((a, b) => b.power - a.power)
     .slice(0, n)
-    .map((c) => ({ ...c, ...(provinceInfo(c.code) || { name: c.code, short: c.code }) }))
+    .map((c) => ({ ...c, ...(regionInfo(c.code) || { name: c.code, short: c.code, flag: '' }) }))
 }
 // Tỉnh đang dẫn đầu BXH tỉnh thành (null nếu chưa ai tặng quà có tỉnh).
 export function provinceLeader(state) {
   return topProvinces(state, 1)[0] || null
 }
 
-// Tên hiển thị của 1 đội: nếu đội đó là 1 tỉnh đang đấu thì hiện tên tỉnh,
-// chưa có tỉnh thì hiện tên đội thường (Đội Đỏ / Đội Xanh).
+// Tên hiển thị của 1 đội: nếu đội đó là 1 vùng (tỉnh/nước) đang đấu thì
+// hiện tên vùng đó (nước thì kèm cờ, vd "🇺🇸 Mỹ"), chưa có vùng thì hiện
+// tên đội thường (Đội Đỏ / Đội Xanh).
 export function teamLabel(state, teamId) {
   const code = state.provinceTeams?.[teamId]
   if (code) {
-    const info = provinceInfo(code)
-    if (info) return info.name
+    const info = regionInfo(code)
+    if (info) return info.flag ? `${info.flag} ${info.name}` : info.name
   }
   return TEAMS[teamId].name
 }
@@ -342,7 +343,7 @@ export function topProvincesByComments(state, n = 2) {
   return Object.entries(counts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, n)
-    .map(([code, count]) => ({ code, count, ...(provinceInfo(code) || { name: code, short: code }) }))
+    .map(([code, count]) => ({ code, count, ...(regionInfo(code) || { name: code, short: code, flag: '' }) }))
 }
 
 // Bình luận tên tỉnh → vào đội tỉnh đó ngay (tự vào đội luôn).
@@ -548,7 +549,8 @@ export function applyPull(state, teamId, power, sender = {}, giftName = '', opts
   const otherBase = state.teams[otherTeam(teamId)].members.length
   const flip = effect > otherBase && otherBase > 0
   const big = effect >= 25
-  const pvTag = pv ? `📍${provinceInfo(pv)?.name || ''} ` : ''
+  const pvInfo = pv ? regionInfo(pv) : null
+  const pvTag = pvInfo ? `${pvInfo.flag ? `${pvInfo.flag} ` : '📍'}${pvInfo.name} ` : ''
   pushFeed(state, 'pull',
     `${TEAMS[teamId].emoji} ${pvTag}${senderName} kéo ${big ? 'CỰC MẠNH' : 'một phát'} cho ${TEAMS[teamId].name}!${losing ? ' (cơ hội cuối ×2)' : ''}${final ? ' (giờ chót ×2)' : ''}${provinceBonus ? ' (tỉnh dẫn đầu ×1,5)' : ''}${flip ? ' 🌊 LẬT KÈO!' : ''}`)
   pushFloater(state, teamId, big ? '💪 KÉO CỰC MẠNH!' : '💪 +KÉO!')

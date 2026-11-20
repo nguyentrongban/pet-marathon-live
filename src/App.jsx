@@ -14,7 +14,8 @@ import AdminPage from './AdminPage'
 import { useTugOfWar } from './game/useTugOfWar'
 import { WS_STATUS } from './game/wsClient'
 import { TEAMS } from './game/engine'
-import { provinceInfo, provinceRank } from './game/provinces'
+import { provinceRank } from './game/provinces'
+import { regionInfo } from './game/regions'
 
 const APP_VERSION = '2.0.0-tug'
 
@@ -80,7 +81,7 @@ function DisplayGame() {
   // pháo hoa). Chỉ hiện 1 cái mỗi loại để không che màn hình.
   const toastFx = (s?.effects || []).filter((e) => e.kind === 'toast').pop()
   const giftFx = (s?.effects || []).filter((e) => e.kind === 'gift').pop()
-  const giftProvince = giftFx?.province ? provinceInfo(giftFx.province) : null
+  const giftProvince = giftFx?.province ? regionInfo(giftFx.province) : null
   // Bùn dính ống kính (quà to): camera quay cận quà to thì bùn bắn dính lên
   // ống kính cho thật — hiện lúc quà to vừa tặng, mờ dần trong ~4 giây.
   // Opacity tính theo tuổi giftCam (snapshot cập nhật mỗi ~200ms) để mờ dần
@@ -91,14 +92,23 @@ function DisplayGame() {
   const bxh = s?.bxh || { gifters: [], likers: [] }
   const provinces = bxh.provinces || []
   const hasBxh = (bxh.gifters?.length || 0) > 0 || (bxh.likers?.length || 0) > 0 || provinces.length > 0
-  // Đấu tỉnh thành: tên đội = tên tỉnh đang đấu (chưa có tỉnh thì Đội Đỏ/Xanh).
+  // Đấu vùng miền: tên đội = tên vùng (tỉnh/nước) đang đấu (nước kèm cờ),
+  // chưa có vùng thì Đội Đỏ/Xanh.
   const teamLabel = (teamId) => {
     const code = s?.provinceTeams?.[teamId]
-    return code ? (provinceInfo(code)?.name || TEAMS[teamId].name) : TEAMS[teamId].name
+    if (code) {
+      const info = regionInfo(code)
+      if (info) return info.flag ? `${info.flag} ${info.name}` : info.name
+    }
+    return TEAMS[teamId].name
   }
   const teamShort = (teamId) => {
     const code = s?.provinceTeams?.[teamId]
-    return code ? (provinceInfo(code)?.short || TEAMS[teamId].name) : TEAMS[teamId].name
+    if (code) {
+      const info = regionInfo(code)
+      if (info) return info.flag ? `${info.flag} ${info.short}` : info.short
+    }
+    return TEAMS[teamId].name
   }
 
   return (
@@ -203,7 +213,7 @@ function DisplayGame() {
             </div>
             <div className="pml-gift-name">{giftFx.sender}</div>
             <div className="pml-gift-sub">tặng {giftFx.gift || 'quà'} · <Zap size={13} /> {Math.round(giftFx.power)} lực kéo</div>
-            {giftProvince && <div className="pml-gift-province"><MapPin size={15} /> {giftProvince.name}{giftFx.provinceBonus ? ' · Tỉnh dẫn đầu ×1,5!' : ''}</div>}
+            {giftProvince && <div className="pml-gift-province"><MapPin size={15} /> {giftProvince.flag ? `${giftProvince.flag} ` : ''}{giftProvince.name}{giftFx.provinceBonus ? ' · Vùng dẫn đầu ×1,5!' : ''}</div>}
           </div>
         )}
         {giftFx && giftFx.big && (
@@ -228,7 +238,7 @@ function DisplayGame() {
               <div className="fw-crown"><Sparkles size={26} /> <GiftIcon gift={giftFx.gift} power={giftFx.power} size={56} className="fw-gift-ic" /></div>
               <div className="fw-name">{giftFx.sender}</div>
               <div className="fw-sub">tặng {giftFx.gift || 'quà to'} · <Zap size={14} /> {Math.round(giftFx.power)} lực kéo!</div>
-              {giftProvince && <div className="fw-province"><MapPin size={15} /> {giftProvince.name}{giftFx.provinceBonus ? ' · Tỉnh dẫn đầu ×1,5!' : ''}</div>}
+              {giftProvince && <div className="fw-province"><MapPin size={15} /> {giftProvince.flag ? `${giftProvince.flag} ` : ''}{giftProvince.name}{giftFx.provinceBonus ? ' · Vùng dẫn đầu ×1,5!' : ''}</div>}
             </div>
           </div>
         )}
@@ -303,26 +313,26 @@ function DisplayGame() {
                   )}
                   {provinces.length > 0 && (
                     <div className="pml-bxh-sec">
-                      <div className="pml-bxh-head"><MapPin size={13} /> Tỉnh thành dẫn đầu</div>
+                      <div className="pml-bxh-head"><MapPin size={13} /> Tỉnh / Quốc gia dẫn đầu</div>
                       {provinces.map((c, i) => {
                         const rank = provinceRank(c.power)
                         return (
                           <div className="pml-bxh-row" key={`c${i}`}>
                             <span className={`pml-bxh-rank r${i + 1}`}>{i + 1}</span>
-                            <span className="pml-bxh-name">{c.short || c.name}</span>
+                            <span className="pml-bxh-name">{c.flag ? `${c.flag} ` : ''}{c.short || c.name}</span>
                             <span className="pml-bxh-rankbadge" style={{ background: rank.color }}>{rank.name}</span>
                             <span className="pml-bxh-val">{Math.round(c.power)}</span>
                           </div>
                         )
                       })}
-                      <div className="pml-bxh-leader">📍 {provinces[0].name} dẫn đầu — quà của {provinces[0].name} mạnh hơn ×1,5!</div>
+                      <div className="pml-bxh-leader">{provinces[0].flag ? `${provinces[0].flag} ` : '📍 '}{provinces[0].name} dẫn đầu — quà của {provinces[0].name} mạnh hơn ×1,5!</div>
                     </div>
                   )}
                 </>
               ) : (
                 <div className="pml-bxh-mini">
                   {provinces.length > 0 && (
-                    <div className="pml-bxh-minirow"><MapPin size={12} /> {provinces[0].short || provinces[0].name} dẫn đầu · {Math.round(provinces[0].power)} lực</div>
+                    <div className="pml-bxh-minirow"><MapPin size={12} /> {provinces[0].flag ? `${provinces[0].flag} ` : ''}{provinces[0].short || provinces[0].name} dẫn đầu · {Math.round(provinces[0].power)} lực</div>
                   )}
                   {(bxh.gifters?.length || 0) > 0 && (
                     <div className="pml-bxh-minirow"><Gift size={12} /> {bxh.gifters[0].nickname} · {Math.round(bxh.gifters[0].power)} lực</div>

@@ -6,6 +6,8 @@
 import assert from 'node:assert'
 import { createSeqTracker, normalizeEvent, parseCommand } from '../src/game/adapter.js'
 import { detectProvince, provinceInfo, provinceRank } from '../src/game/provinces.js'
+import { detectCountry, countryInfo } from '../src/game/countries.js'
+import { detectRegion, regionInfo } from '../src/game/regions.js'
 import { FPT_COOLDOWN_MS, VOICE_IDS, VOICE_OPTIONS, VoiceEngine, voiceTextBxh, voiceTextFinal, voiceTextGift, voiceTextLikes, voiceTextMatchWin, voiceTextRoundStart, voiceTextRoundWin } from '../src/game/voice.js'
 import {
   DEFAULT_SETTINGS, GiftEngine, MEMBER_TYPES, TEAMS, advance, applyLikes,
@@ -721,6 +723,65 @@ test('tỉnh dẫn đầu: quà của tỉnh đó ×1,5, tỉnh khác không đ�
   assert.equal(topProvinces(s, 3)[0].code, 'hanoi')
   assert.equal(topProvinces(s, 3)[0].power, 25, 'Hà Nội 10 + 15 = 25')
   assert.equal(topProvinces(s, 3)[1].power, 10, 'TP.HCM 10')
+})
+
+// ── 17b. Quốc gia: người nước ngoài bình luận tên nước → vào đội nước đó ─
+test('tên nước trong bình luận/tên → đúng mã nước + cờ', () => {
+  assert.equal(detectCountry('USA go!', ''), 'us', 'USA → Mỹ')
+  assert.equal(detectCountry('Japan fighting', ''), 'jp', 'Japan → Nhật Bản')
+  assert.equal(detectCountry('Hàn Quốc cố lên!', ''), 'kr', 'Hàn Quốc → Hàn Quốc')
+  assert.equal(detectCountry('Mỹ vô địch', ''), 'us', 'Mỹ → USA')
+  assert.equal(detectCountry('Việt Nam', ''), 'vn', 'Việt Nam → nước VN')
+  assert.equal(detectCountry('', 'John from Thailand'), 'th', 'tên nước trong TÊN người cũng tính')
+  assert.equal(detectCountry('hello', 'Lan'), null)
+  assert.equal(countryInfo('us').name, 'Mỹ')
+  assert.equal(countryInfo('us').flag, '🇺🇸')
+  assert.equal(countryInfo('jp').short, 'NHẬT BẢN')
+  assert.equal(countryInfo('xx'), null)
+})
+
+test('detectRegion: tỉnh ưu tiên trước nước; nước nhận khi không có tỉnh', () => {
+  assert.equal(detectRegion('Hà Nội cố lên!', ''), 'hanoi', 'tỉnh được ưu tiên')
+  assert.equal(detectRegion('Mỹ Tho quê tôi', ''), 'dongthap', 'Mỹ Tho là Đồng Tháp, không phải nước Mỹ')
+  assert.equal(detectRegion('USA!', ''), 'us')
+  assert.equal(detectRegion('Japan', ''), 'jp')
+  assert.equal(detectRegion('hello', ''), null)
+  assert.equal(regionInfo('hanoi').kind, 'province')
+  assert.equal(regionInfo('hanoi').flag, '')
+  assert.equal(regionInfo('us').kind, 'country')
+  assert.equal(regionInfo('us').flag, '🇺🇸')
+  assert.equal(regionInfo('xx'), null)
+})
+
+test('bình luận tên nước → vào đội nước đó, 2 nước đông nhất thành 2 đội', () => {
+  const s = freshMatch()
+  joinProvince(s, 'us', 'John', 'john1')
+  joinProvince(s, 'us', 'Mike', 'mike1')
+  joinProvince(s, 'jp', 'Yuki', 'yuki1')
+  joinProvince(s, 'kr', 'Minjun', 'minjun1')
+  assert.equal(s.provinceUsers['john1'].province, 'us')
+  assert.equal(s.teams.A.members.length, 1, 'chưa chọn đội thì người nước ngoài chỉ là challenger, chưa vào đội')
+  syncProvinceTeams(s)
+  assert.deepEqual([s.provinceTeams.A, s.provinceTeams.B].sort(), ['jp', 'us'].sort(), 'Mỹ (2 người) + Nhật (1 người) là 2 đội đấu')
+  assert.equal(s.teams.A.members.length, 3, 'John + Mike (Mỹ) vào đội A cùng Lan (giữ nguyên)')
+  assert.equal(teamLabel(s, 'A'), '🇺🇸 Mỹ', 'tên đội nước kèm cờ')
+  assert.equal(teamLabel(s, 'B'), '🇯🇵 Nhật Bản')
+})
+
+test('BXH vùng miền: quà nước ngoài tính cho nước đó, có cờ + hạng', () => {
+  const s = freshMatch()
+  applyPull(s, 'A', 100, { nickname: 'John', userId: 'john1', province: 'us' }, 'hạc giấy')
+  applyPull(s, 'A', 10, { nickname: 'Hoa', userId: 'hoa', province: 'hanoi' }, 'rosa')
+  const top = topProvinces(s, 3)
+  assert.equal(top[0].code, 'us', 'Mỹ 100 lực đứng đầu')
+  assert.equal(top[0].flag, '🇺🇸', 'BXH nước có cờ')
+  assert.equal(top[0].name, 'Mỹ')
+  assert.equal(top[1].code, 'hanoi')
+  assert.equal(top[1].flag, '', 'tỉnh không có cờ')
+  assert.equal(provinceLeader(s).code, 'us', 'nước dẫn đầu cũng được ×1,5')
+  const r = applyPull(s, 'B', 10, { nickname: 'Mike', userId: 'mike1', province: 'us' }, 'rosa')
+  assert.equal(r.effect, 15, 'quà của nước dẫn đầu ×1,5')
+  assert.equal(r.provinceBonus, true)
 })
 
 test('hiệu ứng quà mang theo tên tỉnh + Xóa BXH xóa luôn BXH tỉnh thành', () => {

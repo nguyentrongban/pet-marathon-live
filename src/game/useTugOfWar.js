@@ -9,7 +9,7 @@ import {
   clearBxh, provinceLeader, createMatch, giftIcon, joinProvince, joinTeam, migrateGiftMap, pushToast,
   startMatch, startRound, syncProvinceTeams, teamLabel, topProvinces, topProvincesByComments, topGifters, topLikers,
 } from './engine'
-import { provinceInfo, detectProvince } from './provinces'
+import { regionInfo, detectRegion } from './regions'
 import { createSeqTracker, normalizeEvent, parseCommand } from './adapter'
 import { TikTokWS, WS_STATUS } from './wsClient'
 import { SoundEngine } from './sound'
@@ -242,16 +242,17 @@ export function useTugOfWar() {
     const sound = soundRef.current
 
     if (ev.kind === 'chat') {
-      // Chọn tỉnh: bình luận tên tỉnh/thành (Hà Nội, Sài Gòn, Đà Nẵng...)
-      // để quà của mình tính cho tỉnh đó. Bình luận tỉnh là TỰ VÀO ĐỘI
-      // tỉnh đó luôn (đấu tỉnh thành) — chỉ hiện toast khi mới chọn/đổi tỉnh.
-      const pv = detectProvince(ev.comment, '')
+      // Chọn vùng: bình luận tên tỉnh/thành (Hà Nội, Sài Gòn, Đà Nẵng...)
+      // hoặc tên nước (USA, Japan, Hàn Quốc...) để quà của mình tính cho
+      // vùng đó. Bình luận vùng là TỰ VÀO ĐỘI vùng đó luôn (đấu vùng miền)
+      // — chỉ hiện toast khi mới chọn/đổi vùng.
+      const pv = detectRegion(ev.comment, '')
       if (pv) {
         const isNew = s.userProvince[ev.userId] !== pv
         const jr = joinProvince(s, pv, ev.nickname, ev.userId, ev.avatar || '')
         if (isNew && jr.ok) {
-          const info = provinceInfo(pv)
-          if (info) pushToast(s, `📍 ${ev.nickname} đã chọn ${info.name}! Tặng quà để đưa ${info.name} lên số 1!`)
+          const info = regionInfo(pv)
+          if (info) pushToast(s, `${info.flag ? `${info.flag} ` : '📍 '}${ev.nickname} đã chọn ${info.name}! Tặng quà để đưa ${info.name} lên số 1!`)
         }
       }
       const cmd = parseCommand(ev.comment)
@@ -284,9 +285,9 @@ export function useTugOfWar() {
     }
 
     if (ev.kind === 'gift') {
-      // Tỉnh của người tặng: tên tỉnh trong chữ kèm quà hoặc tên người tặng,
-      // rồi tới tỉnh người đó đã chọn trước đó.
-      const pv = detectProvince(ev.text || '', ev.nickname) || s.userProvince[ev.userId] || null
+      // Vùng của người tặng: tên tỉnh/nước trong chữ kèm quà hoặc tên người
+      // tặng, rồi tới vùng người đó đã chọn trước đó.
+      const pv = detectRegion(ev.text || '', ev.nickname) || s.userProvince[ev.userId] || null
       if (pv) s.userProvince[ev.userId] = pv
       const res = engineRef.current.receive({
         id: ev.id || `${ev.userId}:${ev.giftName}:${Date.now()}`,
