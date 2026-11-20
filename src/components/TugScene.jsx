@@ -4,9 +4,11 @@
 // đều miễn phí, không cần ghi nguồn. Animation kéo được tạo dáng bằng code
 // trên xương (ngửa người, 2 tay nắm dây, chân trụ) vì clip "Pulling A Rope"
 // của Mixamo cần đăng nhập mới tải được.
-// Sân 3D toàn bộ (KHÔNG dùng ảnh thật): trời Sky shader + mây 3D, đất
-// địa hình lồi lõm + màu lá theo đỉnh, cây rừng + bụi + cỏ 3D (3dassets.dev
-// CC0), đồi xa + hàng rào gỗ 3D, gió đung đưa cỏ/cây/mây, bóng đổ.
+// Sân 3D toàn bộ: trời HDRI asset thật (Autumn Field Pure Sky, Poly
+// Haven CC0) + mây asset thật (Cloud01–04, CC0), đất địa hình lồi lõm +
+// màu lá theo đỉnh, RỪNG THÔNG 3D (thông Scots Pine thật, CC0) lùi xa phía
+// sau + 2 bên, bụi + cỏ 3D chỉ phía sau sân (không che camera), đồi xa +
+// hàng rào gỗ 3D, gió đung đưa cỏ/cây/mây, bóng đổ.
 // Đọc trực tiếp state engine qua liveRef mỗi khung hình nên chuyển động mượt
 // mà không cần React render lại.
 
@@ -14,7 +16,7 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
-import { Sky } from 'three/addons/objects/Sky.js'
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
 import { clone as cloneModel } from 'three/addons/utils/SkeletonUtils.js'
 import { TEAMS, visibleMembers } from '../game/engine'
 import { regionInfo } from '../game/regions'
@@ -368,11 +370,15 @@ export default function TugScene({ liveRef }) {
     scene.background = new THREE.Color(0x87ceeb)
     // Sương mù xa: màu xanh nhạt theo chân trời, đẩy xa để đồi + rừng xa
     // mờ dần tự nhiên như ngoài đời (không cắt cụt).
-    scene.fog = new THREE.Fog(0xbfd4e6, 55, 160)
+    // Sương mù khí quyển (tấn: cảnh nhìn giả vì xa gần đều nét đều màu
+    // như đồ nhựa) — sương bắt đầu từ 30m (sau hàng thông) và đặc dần
+    // tới 95m, để cây xa + đồi xa chìm dần vào màn sương xanh như ngoài
+    // đời thật, tạo chiều sâu không khí thay vì nền phẳng.
+    scene.fog = new THREE.Fog(0xbfd4e6, 30, 95)
     const camera = new THREE.PerspectiveCamera(66, width / height, 0.1, 400)
     camera.position.set(0, 6.2, 23)
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x4a7c59, 0.7))
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x4a7c59, 0.55))
     // Nắng CHÍNH từ phía trước-trái-cao (hướng về camera): chiếu thẳng
     // vào mặt trước của nhân vật (mặt hướng về camera) để nhân vật sáng
     // lên, không bị tối đen vì bóng lưng. Trước đây nắng ở phía sau
@@ -397,18 +403,20 @@ export default function TugScene({ liveRef }) {
     fill.position.set(8, 7, 14)
     scene.add(fill)
 
-    // ── Bầu trời 3D (không dùng ảnh): shader Sky của Three.js — trời xanh
-    // chuyển sắc + mặt trời thật, như bầu trời trong game 3D. Mây là khối
-    // 3D (cụm cầu trắng) trôi theo gió, xem dưới.
-    const sky = new Sky()
-    sky.scale.setScalar(300)
-    const skyU = sky.material.uniforms
-    skyU.turbidity.value = 4
-    skyU.rayleigh.value = 2.5
-    skyU.mieCoefficient.value = 0.002
-    skyU.mieDirectionalG.value = 0.8
-    skyU.sunPosition.value.copy(sunDir)
-    scene.add(sky)
+    // ── Bầu trời 3D — ASSET THẬT (tấn chọn Trời 2 "Xanh trong nắng",
+    // 2026-11-20): file HDRI Autumn Field Pure Sky, Poly Haven CC0,
+    // 1k (1MB). HDRI là bầu trời 360° thật bọc quanh cả sân 3D (không
+    // phải ảnh phẳng, không phải shader vẽ bằng code). Nắng trong HDRI
+    // và đèn nắng chính vẫn giữ hướng cũ để bóng đổ không đổi.
+    new RGBELoader().load('/env3/sky/autumn_field_puresky_1k.hdr', (tex) => {
+      tex.mapping = THREE.EquirectangularReflectionMapping
+      const pmrem = new THREE.PMREMGenerator(renderer)
+      const envTex = pmrem.fromEquirectangular(tex).texture
+      scene.background = envTex
+      scene.environment = envTex
+      tex.dispose()
+      pmrem.dispose()
+    }, undefined, () => { /* thiếu file trời thì sân vẫn có nắng + đất */ })
 
     // ── Đất 3D (không dùng ảnh): địa hình lồi lõm nhẹ bằng đỉnh lưới +
     // màu lá vẽ theo đỉnh (từng mảng xanh đậm/nhạt như đồng cỏ thật).
@@ -452,7 +460,28 @@ export default function TugScene({ liveRef }) {
       groundGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
       groundGeo.computeVertexNormals()
     }
+    // ── Nền đất 3D — ASSET THẬT (tấn chọn Đất 2 "Cỏ lá", 2026-11-20):
+    // chất liệu cỏ lá PBR Leafy Grass, Poly Haven CC0, 1k (màu + normal
+    // + roughness). Texture lát lặp khắp sân (RepeatWrapping) để cỏ lá
+    // hiện chi tiết thật (từng lá, từng cọng cỏ, độ gồ ghề) thay vì màu
+    // xanh trơn vẽ bằng code. Giữ nguyên màu đỉnh (vertexColors) để sân
+    // vẫn có mảng xanh đậm/nhạt lớn — màu cuối = texture × màu đỉnh.
+    const texLoader = new THREE.TextureLoader()
+    const groundDiff = texLoader.load('/env3/ground/leafy_grass_diff_1k.jpg')
+    groundDiff.colorSpace = THREE.SRGBColorSpace
+    const groundNor = texLoader.load('/env3/ground/leafy_grass_nor_gl_1k.jpg')
+    const groundRough = texLoader.load('/env3/ground/leafy_grass_rough_1k.jpg')
+    ;[groundDiff, groundNor, groundRough].forEach((t) => {
+      t.wrapS = THREE.RepeatWrapping
+      t.wrapT = THREE.RepeatWrapping
+      t.repeat.set(45, 30)
+      t.anisotropy = 4
+    })
     const ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({
+      map: groundDiff,
+      normalMap: groundNor,
+      normalScale: new THREE.Vector2(0.9, 0.9),
+      roughnessMap: groundRough,
       vertexColors: true, roughness: 1, metalness: 0,
     }))
     ground.rotation.x = -Math.PI / 2
@@ -462,15 +491,54 @@ export default function TugScene({ liveRef }) {
     // Chiều cao mặt đất tại (x, z) — cây/cỏ/bụi phải đứng đúng mặt đất
     // (địa hình lồi lõm ngoài khu vực chơi), không lơ lửng hay chìm.
     const terrainY = (x, z) => terrainNoise(x, z) * terrainMask(x, z) - 0.05
-    // Hố bùn 3D: 2 vòng nâu đậm dần (màu trơn, không ảnh) + vài cục bùn ở mép.
-    const mudMat = new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 1, metalness: 0 })
-    const mudOuter = new THREE.Mesh(new THREE.CircleGeometry(3.4, 28), mudMat)
+    // Hố bùn 3D — ASSET THẬT (tấn chọn Bùn 3 "Ướt bóng", 2026-11-20):
+    // chất liệu bùn ướt PBR Brown Mud 03, Poly Haven CC0, 1k (màu +
+    // normal + roughness). Bùn ướt bóng nước, có dấu chân, gồ ghề thật —
+    // thay cho 2 vòng nâu trơn vẽ bằng code. Lát lặp 2×2 trên vũng bùn
+    // để thấy rõ từng vũng nước + cục bùn.
+    const mudDiff = texLoader.load('/env3/ground/brown_mud_03_diff_1k.jpg')
+    mudDiff.colorSpace = THREE.SRGBColorSpace
+    const mudNor = texLoader.load('/env3/ground/brown_mud_03_nor_gl_1k.jpg')
+    const mudRough = texLoader.load('/env3/ground/brown_mud_03_rough_1k.jpg')
+    ;[mudDiff, mudNor, mudRough].forEach((t) => {
+      t.wrapS = THREE.RepeatWrapping
+      t.wrapT = THREE.RepeatWrapping
+      t.repeat.set(2, 2)
+      t.anisotropy = 4
+    })
+    const mudMat = new THREE.MeshStandardMaterial({
+      map: mudDiff, normalMap: mudNor, normalScale: new THREE.Vector2(1, 1),
+      roughnessMap: mudRough, roughness: 0.85, metalness: 0,
+    })
+    // Vũng bùn KHÔNG tròn xoe (tấn dặn 2026-11-20: không có vũng bùn nào
+    // tròn xoe vậy, không hợp lí) — vành vũng lượn sóng không đều bằng
+    // nhiễu sin theo góc, mép lượn nhiều, giữa ít lượn, ra hình vũng bùn
+    // tự nhiên như ngoài đời.
+    const makeMudDisc = (radius, segments, seed) => {
+      const geo = new THREE.CircleGeometry(radius, segments)
+      const pos = geo.attributes.position
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i)
+        const y = pos.getY(i)
+        const dist = Math.hypot(x, y)
+        if (dist < 0.001) continue
+        const a = Math.atan2(y, x)
+        const w = 0.22 * Math.sin(a * 3 + seed) + 0.15 * Math.sin(a * 5 + seed * 1.7) + 0.1 * Math.sin(a * 7 + seed * 2.3)
+        const k = 1 + w * Math.pow(dist / radius, 0.8)
+        pos.setX(i, x * k)
+        pos.setY(i, y * k)
+      }
+      geo.computeVertexNormals()
+      return geo
+    }
+    const mudOuter = new THREE.Mesh(makeMudDisc(3.4, 48, 1.3), mudMat)
     mudOuter.rotation.x = -Math.PI / 2
     mudOuter.position.set(0, 0.01, 0)
     mudOuter.receiveShadow = true
     scene.add(mudOuter)
-    const mudInner = new THREE.Mesh(new THREE.CircleGeometry(2.4, 24),
-      new THREE.MeshStandardMaterial({ color: 0x54331a, roughness: 1, metalness: 0 }))
+    const mudInnerMat = mudMat.clone()
+    mudInnerMat.color.set(0xbbbbbb) // giữa vũng tối hơn 1 chút
+    const mudInner = new THREE.Mesh(makeMudDisc(2.4, 40, 4.1), mudInnerMat)
     mudInner.rotation.x = -Math.PI / 2
     mudInner.position.set(0, 0.02, 0)
     mudInner.receiveShadow = true
@@ -516,6 +584,7 @@ export default function TugScene({ liveRef }) {
     const envGroup = new THREE.Group()
     scene.add(envGroup)
     const envLoader = new GLTFLoader()
+    envLoader.setMeshoptDecoder(MeshoptDecoder) // mây asset nén meshopt (như player.glb) — thiếu dòng này là mây load lỗi im lặng, trời không có mây
     const swayTrees = [] // { group, phase, amp } — đung đưa theo gió
     const placeEnv = (url, list, { sway = 0 } = {}) => {
       envLoader.loadAsync(url).then((gltf) => {
@@ -535,48 +604,59 @@ export default function TugScene({ liveRef }) {
     placeEnv('/track/track-tents.glb', [
       { x: -11, z: -9 }, { x: 11, z: -9 },
     ])
-    // Rừng quanh sân: sồi + beech + liễu + thông, nhiều tuổi, tán chi
-    // tiết. ÍT CÂY — chỉ 4 cụm nhỏ ở phía sau xa (không trồng 2 bên, vì
-    // cây gần sẽ che + tranh với nhân vật). Tâm điểm là các nhân vật kéo
-    // dây ở giữa, cây chỉ làm nền mờ phía sau.
+    // Rừng THÔNG thật (mẫu 3 tấn chọn, 2026-11-20): chỉ dùng thông Scots
+    // Pine (3dassets.dev CC0, cây thông thật — dáng tháp nhọn, tán hẹp
+    // nên che ít hơn sồi/beech tán rộng). Cây thông Poly Haven ảnh thật
+    // nặng ~7 triệu tam giác + file 478MB, điện thoại chạy không nổi nên
+    // không dùng. Rừng thông xếp 2 hàng lùi xa phía sau (z −26 → −34) +
+    // 2 bên hông, KHÔNG trồng trước mặt camera (z > 0) và KHÔNG trồng
+    // giữa (|x| < 10) — giữa để trời + bảng tỉnh + nhân vật, không bị
+    // cây che. Tán thông hẹp nên dù cao cũng chỉ làm nền 2 bên, không
+    // phủ lên giữa khung hình.
     // Random có hạt giống cố định để cảnh không đổi mỗi lần tải lại.
+    // RỪNG THÔNG THẬT — đổi sang Vân Sam Na Uy (Norway Spruce, 3dassets.dev
+    // CC0) 2026-11-20 vì Scots Pine cũ tán tròn như kẹo mút, nhìn giả.
+    // Vân Sam hình nón thật (tán từng tầng lá, nhọn lên trên như cây thông
+    // Noel): cây trưởng thành cao 20m, rộng chỉ 5,9m (Scots Pine cũ cao
+    // 17m mà rộng tới 17m nên mới tròn xoe). Dùng 2 cỡ xen kẽ cho rừng
+    // tự nhiên: trưởng thành s 0,7 (~11–15m) + cây non s 2,2 (~6,6m).
     const treeDefs = [
-      { url: '/env3/forest/oak_old.glb', s: 1.2 },
-      { url: '/env3/forest/oak_mature.glb', s: 1.15 },
-      { url: '/env3/forest/beech_old.glb', s: 1.2 },
-      { url: '/env3/forest/beech_mature.glb', s: 1.15 },
-      { url: '/env3/forest/willow_mature.glb', s: 1.15 },
-      { url: '/env3/forest/scots_pine_mature.glb', s: 1.2 },
+      { url: '/env3/forest/norway_spruce_mature.glb', s: 0.7 },
+      { url: '/env3/forest/norway_spruce_young.glb', s: 2.2 },
     ]
     const treeRand = (() => { let seed = 7; return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646 } })()
     const treeSpots = []
-    // 4 cụm, mỗi cụm 2 cây chen nhau, chỉ ở hàng rào phía sau xa, TRÁNH
-    // GIỮA (|x| < 12) — cây ở giữa sẽ che trời + tranh với nhân vật ở
-    // trung tâm khung hình. Cây chỉ làm nền 2 bên, giữa để trời + đồi.
-    const clusterX = [-26, -15, 15, 26]
-    for (let c = 0; c < 4; c++) {
-      const cx = clusterX[c] + (treeRand() - 0.5) * 4
-      const cz = -22 + treeRand() * 5
-      for (let k = 0; k < 2; k++) {
+    // Hàng sau xa (z −32): 10 cây dàn đều khắp lưng chừng, kể cả giữa
+    // (đứng sau bảng vàng, không che bảng vì bảng ở z −10 gần camera hơn).
+    // Hàng giữa (z −26): 4 cây 2 bên. Hông (x ±28, z −18): 2 cây.
+    // Tổng 16 cây thông — thành rừng thông thật, không còn lưa thưa.
+    const pineRows = [
+      { z: -32, xs: [-30, -24, -18, -12, -6, 6, 12, 18, 24, 30] },
+      { z: -26, xs: [-24, -16, 16, 24] },
+      { z: -18, xs: [-28, 28] },
+    ]
+    pineRows.forEach((row) => {
+      row.xs.forEach((x) => {
         treeSpots.push({
-          x: cx + (treeRand() - 0.5) * 4,
-          z: cz + (treeRand() - 0.5) * 3,
+          x: x + (treeRand() - 0.5) * 3,
+          z: row.z + (treeRand() - 0.5) * 3,
           ry: treeRand() * 6.28,
-          s: 0.8 + treeRand() * 0.4,
+          s: 0.8 + treeRand() * 0.3,
         })
-      }
-    }
+      })
+    })
     treeDefs.forEach((def, k) => {
       placeEnv(def.url, treeSpots.filter((_, i) => i % treeDefs.length === k).map((t) => ({ ...t, s: t.s * def.s })), { sway: 0.02 })
     })
-    // Bụi rừng rải rác quanh sân (ít thôi, để nền thoáng, nhân vật nổi).
+    // Bụi rừng rải rác — CHỈ phía sau sân (z −15 → −25), KHÔNG trồng
+    // trước mặt camera (z > 0) vì bụi gần camera sẽ che khuất tầm nhìn.
     const bushSpots = []
     for (let i = 0; i < 6; i++) {
       let x, z
       do {
         x = -26 + Math.random() * 52
-        z = -18 + Math.random() * 30
-      } while ((Math.abs(x) < 8 && Math.abs(z) < 5) || z > 13)
+        z = -25 + Math.random() * 10
+      } while (Math.abs(x) < 10 && z > -20)
       bushSpots.push({ x, z, ry: Math.random() * 6.28, s: 0.9 + Math.random() * 0.7 })
     }
     placeEnv('/env3/forest/holly_bush.glb', bushSpots.filter((_, i) => i % 2 === 0))
@@ -620,10 +700,18 @@ export default function TugScene({ liveRef }) {
       provinceBannerSlots.push({ grp, canvas, tex, cloth })
     }
     let provinceBannerSig = ''
-    // ── Đồi xa 3D: khối cầu dẹt xanh dịu (mờ dần theo sương mù, không
-    // tranh với nhân vật), bao quanh chân trời như núi đồi ngoài đời.
-    const hillMat = new THREE.MeshStandardMaterial({ color: 0x6f9a63, roughness: 1, metalness: 0 })
-    const hillMat2 = new THREE.MeshStandardMaterial({ color: 0x7ba06b, roughness: 1, metalness: 0 })
+    // ── Đồi xa 3D: khối cầu dẹt (mờ dần theo sương mù, không tranh với
+    // nhân vật), bao quanh chân trời như núi đồi ngoài đời. Phủ chất liệu
+    // cỏ lá thật (Leafy Grass, cùng asset nền đất) để đồi không còn màu
+    // xanh trơn như đồi nhựa — nhìn rõ từng mảng cỏ lá trên sườn đồi.
+    const hillDiff = texLoader.load('/env3/ground/leafy_grass_diff_1k.jpg')
+    hillDiff.colorSpace = THREE.SRGBColorSpace
+    hillDiff.wrapS = THREE.RepeatWrapping
+    hillDiff.wrapT = THREE.RepeatWrapping
+    hillDiff.repeat.set(10, 6)
+    hillDiff.anisotropy = 4
+    const hillMat = new THREE.MeshStandardMaterial({ map: hillDiff, color: 0xa8c49a, roughness: 1, metalness: 0 })
+    const hillMat2 = new THREE.MeshStandardMaterial({ map: hillDiff, color: 0xb5d0a8, roughness: 1, metalness: 0 })
     const hillSpots = [
       { x: -55, z: -55, r: 26, h: 0.32 }, { x: -18, z: -62, r: 30, h: 0.38 },
       { x: 20, z: -58, r: 28, h: 0.34 }, { x: 55, z: -50, r: 24, h: 0.3 },
@@ -664,45 +752,70 @@ export default function TugScene({ liveRef }) {
     addFenceRun(fenceRect.x0, fenceRect.z0, fenceRect.x0, fenceRect.z1)
     addFenceRun(fenceRect.x1, fenceRect.z0, fenceRect.x1, fenceRect.z1)
     scene.add(fenceGroup)
-    // Mây 3D — cụm cầu trắng to, trôi chậm theo gió (xem animate).
-    // Đặt thấp + gần hơn để thấy rõ trong khung hình (mây cao quá thì
-    // ra khỏi khung, trời trống trơn).
+    // Mây 3D — ASSET THẬT (không tự vẽ bằng code, không lấy ảnh): model
+    // mây Cloud01–04, bộ Avatar Garden, CC0, file .glb 30KB (tấn dặn
+    // "lấy asset chứ làm làm gì lên mạng tìm"). Mây trắng, trôi chậm theo
+    // gió (xem animate). Mỗi đám mây ở độ cao khác nhau (y 13 / 16 / 19)
+    // để từng đám mây nổi rõ riêng lẻ trên nền trời xanh, có khoảng trời
+    // xanh giữa các đám mây. Mây là mặt phẳng mỏng (dày 0,06m) nên luôn
+    // quay mặt về phía camera (mặt mây hướng +Z, camera ở +Z nhìn về −Z).
     const decor = new THREE.Group()
     const decorClouds = []
-    // 2 đám mây cố định ở vị trí đẹp trong khung hình (luôn thấy), còn lại
+    const cloudUrls = ['/env3/clouds/cloud01.glb', '/env3/clouds/cloud02.glb', '/env3/clouds/cloud03.glb', '/env3/clouds/cloud04.glb']
+    // 3 đám mây cố định ở vị trí đẹp trong khung hình (luôn thấy), còn lại
     // random để trời không đơn điệu.
-    const fixedClouds = [{ x: -9, y: 9.5, z: -16 }, { x: 11, y: 11, z: -19 }]
-    fixedClouds.forEach((fc) => {
-      const cloud = new THREE.Group()
-      for (let j = 0; j < 6; j++) {
-        // Mây dùng MeshBasicMaterial (không nhận sáng): mây lúc nào cũng
-        // trắng sáng, không bị tối đen khi đổi góc nắng. (Nắng chuyển ra
-        // phía trước 2026-11-19 làm mây Lambert tối sầm như mây giông.)
-        const puff = new THREE.Mesh(new THREE.SphereGeometry(2.6 + Math.random() * 1.2, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 }))
-        puff.position.set((j - 3) * 2.4 + Math.random(), Math.random() * 0.9, (Math.random() - 0.5) * 1.5)
-        puff.scale.y = 0.7
-        cloud.add(puff)
-      }
-      cloud.position.set(fc.x, fc.y, fc.z)
-      decor.add(cloud)
-      decorClouds.push(cloud)
+    const fixedClouds = [{ x: -14, y: 9, z: -20 }, { x: 12, y: 11, z: -24 }, { x: 0, y: 13, z: -28 }]
+    const randomClouds = []
+    for (let i = 0; i < 1; i++) randomClouds.push({ x: -26 + Math.random() * 52, y: 10 + Math.random() * 5, z: -18 - Math.random() * 12 })
+    const allCloudSpots = [...fixedClouds, ...randomClouds]
+    // Tải từng file riêng (không dùng Promise.all — 1 file lỗi thì các
+    // mây khác vẫn hiện, không mất hết cả bầu trời).
+    cloudUrls.forEach((url, k) => {
+      envLoader.loadAsync(url).then((gltf) => {
+        // Mỗi file mây dùng cho 1–2 vị trí (4 file, 5 vị trí).
+        const spots = allCloudSpots.filter((_, i) => i % cloudUrls.length === k)
+        spots.forEach((spot) => {
+          const cloud = gltf.scene.clone()
+          // Mây asset: texture gốc là mây VÀNG trên nền ĐEN (không có kênh
+          // alpha dùng được) nên không dùng làm map màu được. Dùng texture
+          // làm alphaMap (chỗ sáng = mây, chỗ đen = trong suốt) + màu
+          // trắng → mây trắng đúng hình, nền trong suốt. MeshBasicMaterial
+          // không nhận sáng nên mây luôn trắng sáng. DoubleSide vì mây là
+          // mặt phẳng mỏng.
+          cloud.traverse((o) => {
+            if (o.isMesh) {
+              const tex = o.material && o.material.map ? o.material.map : null
+              o.material = new THREE.MeshBasicMaterial({ color: 0xffffff, alphaMap: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false })
+              o.castShadow = false
+            }
+          })
+          // Chuẩn hoá kích thước theo bounding box thật (file mây dùng đơn vị
+          // lạ, đo thô ra tới hàng chục nghìn đơn vị — không chuẩn hoá thì
+          // mây khổng lồ che kín cả bầu trời). Đưa về rộng ~10–13m để mây
+          // nổi rõ trên nền trời HDRI xanh.
+          const box = new THREE.Box3().setFromObject(cloud)
+          const size = new THREE.Vector3()
+          box.getSize(size)
+          const maxDim = Math.max(size.x, size.y, size.z, 0.001)
+          const target = 10 + Math.random() * 3
+          cloud.scale.setScalar(target / maxDim)
+          // Mây asset là mặt phẳng mỏng: rộng 5,55m theo trục Z, dày 0,06m
+          // theo trục X — xoay 90° quanh Y để mặt mây quay về phía camera
+          // (mặt mây hướng +Z, camera ở +Z nhìn về −Z), không thì mây chỉ
+          // là 1 lát mỏng nhìn ngang, gần như tàng hình.
+          cloud.rotation.y = Math.PI / 2
+          cloud.position.set(spot.x, spot.y, spot.z)
+          decor.add(cloud)
+          decorClouds.push(cloud)
+        })
+      }).catch((e) => { console.warn('[cloud] load fail', url, String(e).slice(0, 120)) })
     })
-    for (let i = 0; i < 5; i++) {
-      const cloud = new THREE.Group()
-      const puffs = 5 + Math.floor(Math.random() * 3)
-      for (let j = 0; j < puffs; j++) {
-        const puff = new THREE.Mesh(new THREE.SphereGeometry(2.8 + Math.random() * 1.6, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 }))
-        puff.position.set((j - puffs / 2) * 2.6 + Math.random(), Math.random() * 1.0, (Math.random() - 0.5) * 1.8)
-        puff.scale.y = 0.7
-        cloud.add(puff)
-      }
-      cloud.position.set(-26 + Math.random() * 52, 8 + Math.random() * 3, -12 - Math.random() * 8)
-      decor.add(cloud)
-      decorClouds.push(cloud)
-    }
     scene.add(decor)
     // Bụi cỏ rừng rải DÀY quanh sân (3dassets.dev CC0) — InstancedMesh cho
     // nhẹ máy. Gió: từng bụi cỏ đung đưa (grassSway, xem animate).
+    // CHỈ trồng cỏ phía SAU sân (z < −2) và 2 bên hông (|x| > 10) — KHÔNG
+    // trồng trước mặt camera (z > 0, gần ống kính) vì cỏ gần camera sẽ
+    // che khuất tầm nhìn (tấn báo cây cối che camera).
     const grassSway = [] // { mesh, base: [{x,z,ry,s,phase}] }
     const makeGrass = (url, count, scaleBase) => {
       envLoader.loadAsync(url).then((gltf) => {
@@ -721,7 +834,7 @@ export default function TugScene({ liveRef }) {
             do {
               x = -30 + Math.random() * 60
               z = -18 + Math.random() * 32
-            } while ((Math.abs(x) < 5.5 && Math.abs(z) < 2.5) || Math.hypot(x, z) < 4.2)
+            } while ((z > -2 && Math.abs(x) < 10) || Math.hypot(x, z) < 4.2)
             const ry = Math.random() * Math.PI * 2
             const s = scaleBase * (0.7 + Math.random() * 0.8)
             const gy = terrainY(x, z)
