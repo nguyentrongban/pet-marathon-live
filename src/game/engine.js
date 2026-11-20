@@ -745,6 +745,10 @@ export function tick(state, dt) {
   // Dây tự trôi nhẹ về giữa — không ai kéo thì lợi thế mất dần.
   state.rope *= Math.exp(-state.settings.ropeDecay * dt)
   if (Math.abs(state.rope) >= state.settings.winLine) {
+    // Dừng cờ ĐÚNG vạch thắng (không vượt quá): dây chạy theo vận tốc nên
+    // 1 nhịp có thể vọt qua vạch 1 tí, cờ sẽ lệch khỏi gạch vàng. Kẹp về
+    // đúng ±winLine để cờ nằm đúng vạch khi màn kết thúc.
+    state.rope = Math.sign(state.rope) * state.settings.winLine
     endRound(state, state.rope > 0 ? 'A' : 'B')
     return
   }

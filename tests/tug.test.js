@@ -1254,6 +1254,27 @@ await asyncTest('nhạc nền: hết bài tự chuyển bài sau; tắt nhạc t
 })
 
 
+// ─── Cờ dừng đúng vạch thắng ──────────────────────────────────────────────
+// Dây chạy theo vận tốc nên 1 nhịp có thể vọt qua vạch thắng 1 tí, cờ sẽ
+// lệch khỏi gạch vàng trên thước. Khi thắng bằng dây, kẹp dây về đúng
+// ±winLine để cờ nằm đúng vạch khi màn kết thúc.
+test('thắng bằng dây thì cờ dừng đúng vạch thắng (không vượt quá)', () => {
+  const s = crowdMatch(20, 1) // A mạnh hơn hẳn → dây chạy nhanh về phía A
+  s.rope = 0.69 // sát vạch thắng 0,7
+  step(s, 0.5) // đủ để dây chạm vạch
+  assert.equal(s.phase, 'roundEnd', 'chạm vạch thắng thì hết màn')
+  assert.equal(s.roundWinner, 'A', 'đội A thắng')
+  assert.equal(s.rope, 0.7, 'dây kẹp đúng vạch thắng 0,7, không vượt quá')
+  // Phía đội B cũng vậy (dây âm).
+  const t = crowdMatch(1, 20)
+  t.rope = -0.69
+  step(t, 0.5)
+  assert.equal(t.phase, 'roundEnd')
+  assert.equal(t.roundWinner, 'B')
+  assert.equal(t.rope, -0.7, 'dây kẹp đúng vạch thắng -0,7 phía B')
+})
+
+
 // ─── Bắt đầu từng màn bằng tay (streamer ấn) ─────────────────────────────
 // Hết màn/trận thì KHÔNG tự chạy tiếp — về chờ, hiện bảng hướng dẫn, chờ
 // streamer xem đủ người rồi ấn bắt đầu. Ấn bắt đầu = doStart trong

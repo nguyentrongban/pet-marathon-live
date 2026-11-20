@@ -72,10 +72,18 @@ input, select { font-family: inherit; }
    kính, thùng tiếp tế). Những thứ tấn kêu PHẢI CÓ thì hiện lại: nút nhạc
    (góc trên phải), BXH, bảng giá quà. Còn ẩn: nút tắt tiếng / thử giọng /
    Cách chơi (chỉ giữ nút nhạc trong .pml-top-actions), dòng tên bài nhạc,
-   thanh dưới (số màn · số tim · trạng thái nối live). Mọi điều khiển đã
-   ẩn vẫn dùng được ở Admin. Muốn hiện lại cái nào thì xóa dòng
-   display:none tương ứng. */
+   thanh dưới (số màn · số tim · trạng thái nối live). Riêng nút Mic thử
+   giọng hiện lại lúc đang chờ bắt đầu (xem quy tắc pml-micbtn bên dưới).
+   Mọi điều khiển đã ẩn vẫn dùng được ở Admin. Muốn hiện lại cái nào thì
+   xóa dòng display:none tương ứng. */
 .pml-top-actions > :not(.pml-musicbtn) { display: none !important; }
+/* Ngoại lệ duy nhất: nút Mic thử giọng CHỈ hiện lúc đang chờ bắt đầu
+   (phase waiting, bảng hướng dẫn đang hiện) — lúc đó màn hình chưa kéo
+   nên không làm rối live, mà tấn vẫn bấm được để xem máy có giọng đọc
+   không (câu hỏi giọng đọc vẫn chưa có câu trả lời). Vừa vào màn kéo
+   là nút Mic tự ẩn lại. Bấm thử trong Admin không mở khóa được âm
+   thanh trên tab màn hình iPhone nên không thay thế được nút này. */
+.pml-app[data-phase="waiting"] .pml-top-actions .pml-micbtn { display: inline-flex !important; align-items: center; justify-content: center; }
 .pml-nowplaying,
 .pml-bottombar { display: none !important; }
 /* Bảng hướng dẫn trước khi vô game: song ngữ, mỗi dòng 1 icon + tiếng
@@ -332,12 +340,12 @@ input, select { font-family: inherit; }
 
 /* ── Lật kèo: 1 món quà mạnh hơn cả đội kia — hiện to giữa màn hình 2,5 giây ── */
 .pml-flip {
-  position: absolute; top: 25%; left: 50%; transform: translate(-50%, -50%); z-index: 8;
+  position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); z-index: 8;
   background: linear-gradient(90deg, #0ea5e9, #2563eb); color: #fff;
-  border: 2px solid rgba(255,255,255,.8); border-radius: 18px; padding: 10px 14px;
-  font-size: 16px; font-weight: 900; text-align: center; line-height: 1.35;
+  border: 2px solid rgba(255,255,255,.8); border-radius: 14px; padding: 8px 12px;
+  font-size: 14px; font-weight: 900; text-align: center; line-height: 1.35;
   box-shadow: 0 10px 30px rgba(37, 99, 235, .6); text-shadow: 0 2px 4px rgba(0,0,0,.4);
-  animation: pml-flip-in .3s ease-out; pointer-events: none; max-width: 86vw;
+  animation: pml-flip-in .3s ease-out; pointer-events: none; max-width: 80vw;
 }
 @keyframes pml-flip-in { from { transform: translate(-50%,-50%) scale(.7); } }
 
