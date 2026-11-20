@@ -123,6 +123,76 @@ function mat(color, opts = {}) {
   return new THREE.MeshLambertMaterial({ color, ...opts })
 }
 
+// ── Texture dây thừng gai (vẽ bằng canvas, không cần tải file ngoài) ──
+// Dây thừng thật làm từ 3 sợi xoắn lại: trên mặt dây hiện các dải chéo
+// (sợi xoắn) xen kẽ sáng/tối + xơ gai lấm tấm. 1 ô texture = 1 bước xoắn
+// (~0,6m) quanh hết chu vi dây; lặp lại dọc theo dây. Dùng làm map màu
+// và bumpMap (nổi gờ sợi) để dây nhìn giống thừng thật cả lúc quay cận.
+function makeRopeTexture() {
+  const W = 256, H = 256
+  const c = document.createElement('canvas')
+  c.width = W; c.height = H
+  const g = c.getContext('2d')
+  // Nền gai: tông nâu vàng nhạt xen kẽ cho sợi đay.
+  g.fillStyle = '#c2a06b'
+  g.fillRect(0, 0, W, H)
+  // 3 sợi xoắn: mỗi sợi là 1 dải chéo chạy từ góc trên-trái xuống dưới-phải,
+  // lặp 3 lần quanh chu vi. Vẽ 2 lần (dịch W) để nối liền khi texture lặp.
+  const strand = (dx) => {
+    for (let i = -1; i <= 3; i++) {
+      const x0 = dx + i * (W / 3)
+      // Thân sợi: sáng ở giữa, tối dần về 2 mép (tạo cảm giác sợi tròn).
+      const grad = g.createLinearGradient(x0, 0, x0 + W / 3, 0)
+      grad.addColorStop(0, '#8a6b3d')
+      grad.addColorStop(0.25, '#d9bc85')
+      grad.addColorStop(0.55, '#c8a869')
+      grad.addColorStop(0.85, '#9a7a45')
+      grad.addColorStop(1, '#7d5f31')
+      g.fillStyle = grad
+      g.beginPath()
+      g.moveTo(x0, 0)
+      g.lineTo(x0 + W / 3, 0)
+      g.lineTo(x0 + W / 3 + H * 0.45, H)
+      g.lineTo(x0 + H * 0.45, H)
+      g.closePath()
+      g.fill()
+      // Rãnh tối giữa 2 sợi (chỗ sợi xoắn vào nhau).
+      g.strokeStyle = 'rgba(70,48,20,0.85)'
+      g.lineWidth = 7
+      g.beginPath()
+      g.moveTo(x0, 0)
+      g.lineTo(x0 + H * 0.45, H)
+      g.stroke()
+      // Gờ sáng trên đỉnh sợi.
+      g.strokeStyle = 'rgba(240,220,170,0.55)'
+      g.lineWidth = 4
+      g.beginPath()
+      g.moveTo(x0 + W / 6, 0)
+      g.lineTo(x0 + W / 6 + H * 0.45, H)
+      g.stroke()
+    }
+  }
+  strand(0)
+  // Xơ gai: hàng trăm sợi xơ ngắn, mảnh, nghiêng theo chiều xoắn.
+  for (let i = 0; i < 900; i++) {
+    const x = Math.random() * W
+    const y = Math.random() * H
+    const len = 3 + Math.random() * 7
+    const a = 0.5 + (Math.random() - 0.5) * 0.35 // nghiêng theo chiều xoắn
+    g.strokeStyle = Math.random() < 0.5 ? 'rgba(90,62,28,0.35)' : 'rgba(232,205,150,0.35)'
+    g.lineWidth = 1
+    g.beginPath()
+    g.moveTo(x, y)
+    g.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len)
+    g.stroke()
+  }
+  const tex = new THREE.CanvasTexture(c)
+  tex.wrapS = THREE.RepeatWrapping
+  tex.wrapT = THREE.RepeatWrapping
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
+}
+
 // Vệt bùn dính trên người khi ngã xuống hố: 4 đốm bùn gắn vào nhóm nhân
 // vật (xoay theo người khi ngã), lúc đầu thu nhỏ bằng 0, chạm bùn thì nở
 // dần ra như bùn văng lên dính vào áo/quần/tóc.
@@ -668,18 +738,27 @@ export default function TugScene({ liveRef }) {
     // Dây dài 17m để dù cờ trượt ±3,4m (khi 1 đội thắng áp đảo) thì dây vẫn
     // chạy qua tay người cuối cùng của cả 2 đội (x = ±4,5) — không ai nắm
     // hụt dây. Nút thắt ở 2 đầu dây, ngoài người cuối cùng.
+    // Dây thừng thật: texture sợi xoắn gai + hình học nhiều đốt để uốn
+    // cong được (chùng lúc chờ, căng lúc kéo). X nằm dọc dây, Y là độ võng.
     const ropeGroup = new THREE.Group()
-    const ropeMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 17, 8), mat(0xc9a227))
-    ropeMesh.rotation.z = Math.PI / 2
+    const ropeTex = makeRopeTexture()
+    ropeTex.repeat.set(1, 28) // 1 bước xoắn ~0,6m → 17m dây = 28 bước xoắn
+    const ropeMat = new THREE.MeshLambertMaterial({ map: ropeTex, bumpMap: ropeTex, bumpScale: 0.6 })
+    const ropeGeo = new THREE.CylinderGeometry(0.09, 0.09, 17, 12, 96)
+    ropeGeo.rotateZ(Math.PI / 2) // trục Y → trục X (dọc dây), X ∈ [-8.5, 8.5]
+    const ropeMesh = new THREE.Mesh(ropeGeo, ropeMat)
     ropeMesh.castShadow = true
     ropeGroup.add(ropeMesh)
-    // Nút thắt 2 đầu dây
+    // Lưu vị trí gốc để mỗi khung hình tính lại độ võng (không cộng dồn).
+    const ropeBasePos = ropeGeo.attributes.position.array.slice()
+    // Nút thắt 2 đầu dây (cùng chất liệu thừng)
     for (const x of [-8.4, 8.4]) {
-      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), mat(0x8a6d1f))
+      const knot = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), ropeMat)
       knot.position.set(x, 0, 0)
       ropeGroup.add(knot)
     }
-    // Cờ giữa dây (đỏ/trắng) — vị trí của nó chính là "điểm số" của trận
+    // Cờ giữa dây (đỏ/trắng) — vị trí của nó chính là "điểm số" của trận.
+    // Cờ bám theo độ võng giữa dây (x=0) nên Y của cờ cập nhật mỗi khung hình.
     const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.1, 6), mat(0x495057))
     flagPole.position.set(0, 0.55, 0)
     ropeGroup.add(flagPole)
@@ -1016,6 +1095,7 @@ export default function TugScene({ liveRef }) {
     let lastHealthCheck = 0
     let smoothRopeX = 0
     let smoothRopeY = ROPE_Y
+    let smoothSag = 0.35 // độ võng dây hiện tại (m) — bắt đầu chùng như lúc chờ
     let lastPhase = ''
     let roundEndStart = 0
     let shake = 0
@@ -1078,6 +1158,34 @@ export default function TugScene({ liveRef }) {
       smoothRopeY += (ropeYTarget - smoothRopeY) * damp(2.5)
       ropeGroup.position.set(smoothRopeX, smoothRopeY, 0)
       ropeGroup.rotation.z = -smoothRopeX * 0.012 // dây hơi nghiêng theo hướng kéo
+      // ── Dây thừng chùng / căng như ngoài đời ──
+      // Chờ bắt đầu: không ai gồng → dây chùng xuống, đung đưa nhẹ.
+      // Đang kéo: 2 đội gồng càng mạnh dây càng căng thẳng (hết võng).
+      // Hết màn: đội thua hết gồng → dây lại chùng xuống.
+      const strA = st.teams?.A?.pullRate ?? st.teams?.A?.members?.length ?? 0
+      const strB = st.teams?.B?.pullRate ?? st.teams?.B?.members?.length ?? 0
+      const totalPull = strA + strB
+      let tension = 0
+      if (phase === 'pulling') tension = Math.min(1, Math.max(0.3, totalPull / 8))
+      else if (phase === 'countdown') tension = 0.5
+      else if (phase === 'roundEnd' || phase === 'matchEnd') tension = 0.1
+      const sagTarget = 0.35 * (1 - tension) // võng tối đa 0,35m lúc chờ
+      smoothSag += (sagTarget - smoothSag) * damp(2.0)
+      // Đung đưa nhẹ lúc dây chùng (càng chùng càng đưa), hết đưa lúc căng.
+      const sagNow = smoothSag * (1 + 0.12 * Math.sin(time * 1.4))
+      const swayZ = 0.08 * (1 - tension) * Math.sin(time * 0.9 + 1)
+      const pos = ropeGeo.attributes.position
+      for (let i = 0; i < pos.count; i++) {
+        const ox = ropeBasePos[i * 3]
+        const k = 1 - (ox / 8.5) * (ox / 8.5) // võng nhiều nhất ở giữa, 0 ở 2 đầu
+        pos.array[i * 3 + 1] = ropeBasePos[i * 3 + 1] - sagNow * k
+        pos.array[i * 3 + 2] = ropeBasePos[i * 3 + 2] + swayZ * k
+      }
+      pos.needsUpdate = true
+      ropeGeo.computeVertexNormals()
+      // Cờ bám theo độ võng giữa dây (điểm giữa dây hạ xuống = độ võng).
+      flagPole.position.y = 0.55 - sagNow
+      flagCloth.position.y = 0.85 - sagNow
       flagCloth.rotation.y = Math.sin(time * 3) * 0.25 // cờ phấp phới
       for (const b of banners) b.flag.position.x = b.base + Math.sin(time * 2 + (b.teamId === 'A' ? 0 : 2)) * 0.08
       // ── Bảng tên tỉnh: top 3 tỉnh đổi thì vẽ lại bảng trên 3 cột sau hố bùn ──
