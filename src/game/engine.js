@@ -235,6 +235,9 @@ export function createMatch(settings = DEFAULT_SETTINGS) {
     // 2 tỉnh đang đấu (mã tỉnh cho đội A/B; null = chưa đủ 2 tỉnh → đội Đỏ/Xanh thường).
     provinceTeams: { A: null, B: null },
     nextRoundIn: 0, matchEndIn: 0,
+    // Camera quay cận khi có quà to (≥25 lực): { teamId, at } — đội được
+    // tặng + lúc tặng (theo state.now, giây); null = không quay.
+    giftCam: null,
     settings: { ...settings },
     stats: { gifts: 0, pulls: 0 },
   }
@@ -561,6 +564,12 @@ export function applyPull(state, teamId, power, sender = {}, giftName = '', opts
       power: effect, big, t: 0, dur: big ? 3.5 : 2,
       province: pv || null, provinceBonus,
     })
+  }
+  // Quà to (≥25 lực) mà là quà THẬT: camera quay cận từng người của đội
+  // được tặng (từ trước ra sau) rồi trượt về toàn cảnh — TugScene đọc
+  // state.giftCam để quay. Quà thử (Admin/demo) không quay.
+  if (big && opts.gift !== false) {
+    state.giftCam = { teamId, at: state.now }
   }
   return { ok: true, teamId, effect, comeback: losing, final, flip, province: pv, provinceBonus }
 }

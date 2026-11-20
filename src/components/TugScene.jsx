@@ -1456,9 +1456,27 @@ export default function TugScene({ liveRef }) {
       // camera chạy sang đội thắng để xem họ ăn mừng (nhảy + vẫy tay).
       // Sang màn mới thì trượt ra lại toàn cảnh. Ngã xuống bùn thì camera
       // rung nhẹ 1 cái.
+      // Quà to (≥25 lực): lúc đang kéo, camera quay cận từng người của đội
+      // được tặng, từ trước (gần hố bùn nhất) ra sau, mỗi người ~1,2 giây
+      // (tổng 3,6 giây), rồi trượt về toàn cảnh.
+      const GIFT_CAM_SEG = 1.2 // mỗi người được quay cận ~1,2 giây
+      const GIFT_CAM_SECONDS = GIFT_CAM_SEG * 3 // 3 người/đội → 3,6 giây
       shake *= Math.exp(-5 * dt)
       const sway = Math.sin(time * 0.15) * 0.25
-      if ((phase === 'roundEnd' || phase === 'matchEnd') && loserTeam) {
+      const giftCam = st.giftCam
+      const giftAge = giftCam ? now - giftCam.at : -1
+      if (phase === 'pulling' && giftCam && giftAge >= 0 && giftAge < GIFT_CAM_SECONDS) {
+        const spots = TEAM_SPOTS[giftCam.teamId] || TEAM_SPOTS.A
+        const idx = Math.min(spots.length - 1, Math.floor(giftAge / GIFT_CAM_SEG))
+        const spot = spots[idx]
+        // Đội Đỏ nhìn về +X, đội Xanh nhìn về -X — camera đứng chếch về
+        // phía mặt họ (hướng về giữa sân + hơi lệch ra trước) để thấy mặt
+        // lúc quay cận. Người kéo theo dây (smoothRopeX) nên cộng vào.
+        const dir = giftCam.teamId === 'A' ? 1 : -1
+        const mx = spot.x + smoothRopeX
+        tmpCamPos.set(mx + dir * 2.2, 2.0, spot.z + 4.2)
+        tmpLook.set(mx, 1.3, spot.z)
+      } else if ((phase === 'roundEnd' || phase === 'matchEnd') && loserTeam) {
         const endElapsed = now - roundEndStart
         if (endElapsed < 4) {
           // Chặng 1 (0–4s): đội thua té bùn. Đội thua bị kéo về phía đội
