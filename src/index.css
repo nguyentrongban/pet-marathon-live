@@ -64,8 +64,20 @@ input, select { font-family: inherit; }
   padding: 8px 12px; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.25);
 }
 .pml-helpbtn { font-weight: 800; }
-/* Nút nhạc nền đang phát: viền vàng cho biết nhạc đang chạy. */
-.pml-iconbtn.pml-music-on { border-color: #ffd60a; color: #ffd60a; box-shadow: 0 0 12px rgba(255, 214, 10, .45), 0 4px 14px rgba(0,0,0,.25); }
+/* ── Màn hình SẠCH cho chia sẻ màn hình live ─────────────────────────────
+   Khi tấn chia sẻ màn hình lên TikTok LIVE, mọi thứ trên game đều hiện
+   hết nên màn hình nhìn rối. Vì vậy ẨN hết những gì không cần thiết cho
+   người xem — chỉ giữ lại: cảnh 3D, bảng tỉ số 2 đội + vòng + giờ, thước
+   dây, và các hiệu ứng tạm thời (quà, BOOYAH!, LẬT KÈO!, bùn dính ống
+   kính, thùng tiếp tế). Những thứ đã ẩn (điều khiển vẫn dùng được ở
+   Admin): nút tắt tiếng / thử giọng / nhạc / Cách chơi, BXH, bảng giá
+   quà, dòng tên bài nhạc, thanh dưới (số màn · số tim · trạng thái nối
+   live). Muốn hiện lại cái nào thì xóa dòng display:none tương ứng. */
+.pml-top-actions,
+.pml-bxh,
+.pml-gift-legend,
+.pml-nowplaying,
+.pml-bottombar { display: none !important; }
 /* Dòng "đang phát nhạc": nhỏ, ở dưới thanh trên, bấm nút ⏭ để qua bài. */
 .pml-nowplaying {
   position: absolute; top: calc(52px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 5;
