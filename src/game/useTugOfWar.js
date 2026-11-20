@@ -13,6 +13,7 @@ import { regionInfo, detectRegion } from './regions'
 import { createSeqTracker, normalizeEvent, parseCommand } from './adapter'
 import { TikTokWS, WS_STATUS } from './wsClient'
 import { SoundEngine } from './sound'
+import { MusicEngine } from './music'
 import { VoiceEngine, voiceTextBxh, voiceTextFinal, voiceTextGift, voiceTextLikes, voiceTextMatchWin, voiceTextRoundStart, voiceTextRoundWin } from './voice'
 import { onSyncMessage, postHeartbeat, postHello, postState } from './sync'
 
@@ -147,6 +148,16 @@ export function useTugOfWar() {
     })
   }
 
+  // ── Nhạc nền miễn phí (Pixabay, 6 bài dài ~22 phút, tự chạy nối nhau).
+  // Bắt đầu khi người xem chạm lần đầu (iOS bắt buộc có cử chỉ) hoặc bấm
+  // nút nhạc; bật/tắt + âm lượng + bài đang phát lưu localStorage.
+  const musicRef = useRef(null)
+  if (!musicRef.current) {
+    musicRef.current = new MusicEngine({
+      onChange: () => takeSnap(),
+    })
+  }
+
   // ── Gửi kết quả trận về API (nếu có cấu hình) — không có thì bỏ qua lặng lẽ ──
   const reportMatch = useCallback((state) => {
     const api = import.meta.env?.VITE_API_URL || ''
@@ -195,6 +206,8 @@ export function useTugOfWar() {
       provinceBattle: topProvincesByComments(s, 2),
       // Camera quà: App đọc giftCam để hiện bùn dính ống kính khi quà to.
       giftCam: s.giftCam ? { ...s.giftCam } : null,
+      // Nhạc nền: App đọc để hiện nút nhạc + tên bài đang phát.
+      music: musicRef.current ? musicRef.current.state() : { playing: false, enabled: true, volume: 0.4, index: 0, track: null },
       queueLength: engineRef.current.queueLength,
       settings: s.settings,
       voiceMode: voiceRef.current ? voiceRef.current.getMode() : 'device',
@@ -222,6 +235,8 @@ export function useTugOfWar() {
       provinceTeams: { ...s.provinceTeams },
       provinceBattle: topProvincesByComments(s, 2),
       queueLength: engineRef.current.queueLength,
+      // Nhạc nền: Admin đọc để hiện bài đang phát + nút điều khiển.
+      music: musicRef.current ? musicRef.current.state() : { playing: false, enabled: true, volume: 0.4, index: 0, track: null },
       settings: s.settings, wsStatus, wsDetail,
       wsLog: wsLog.slice(0, 30),
     })
@@ -406,6 +421,19 @@ export function useTugOfWar() {
         // cả khi đang tắt tiếng (để streamer kiểm tra giọng có kêu không).
         voiceRef.current?.speakDeviceTest('Hà Nội đang dẫn đầu, thử giọng đọc bình luận!')
         takeSnap()
+      } else if (msg.cmd === 'musicToggle') {
+        // Nhạc nền: bật/tắt từ Admin (điều khiển màn hiển thị từ xa).
+        musicRef.current?.toggle()
+        takeSnap()
+      } else if (msg.cmd === 'musicNext') {
+        musicRef.current?.next()
+        takeSnap()
+      } else if (msg.cmd === 'musicVolume') {
+        musicRef.current?.setVolume(msg.volume)
+        takeSnap()
+      } else if (msg.cmd === 'musicOn') {
+        musicRef.current?.setEnabled(msg.enabled !== false)
+        takeSnap()
       } else if (msg.cmd === 'connect') {
         try { localStorage.setItem(WS_KEY, JSON.stringify({ wsUrl: msg.wsUrl, key: msg.key })) } catch { /* ignore */ }
         wsRef.current?.connect(msg.wsUrl, msg.key)
@@ -552,7 +580,7 @@ export function useTugOfWar() {
 
   // ── Mở khóa âm thanh sau lần chạm đầu (trình duyệt chặn autoplay) ──
   useEffect(() => {
-    const unlock = () => { soundRef.current.ensure(); voiceRef.current?.unlock() }
+    const unlock = () => { soundRef.current.ensure(); voiceRef.current?.unlock(); musicRef.current?.unlock() }
     window.addEventListener('pointerdown', unlock)
     return () => window.removeEventListener('pointerdown', unlock)
   }, [])
@@ -671,9 +699,23 @@ export function useTugOfWar() {
     }
   }, [takeSnap])
 
+  // Nhạc nền: bật/tắt + qua bài + âm lượng (nút nhạc trên màn hiển thị).
+  const toggleMusic = useCallback(() => {
+    musicRef.current?.toggle()
+    takeSnap()
+  }, [takeSnap])
+  const nextTrack = useCallback(() => {
+    musicRef.current?.next()
+    takeSnap()
+  }, [takeSnap])
+  const setMusicVolume = useCallback((v) => {
+    musicRef.current?.setVolume(v)
+    takeSnap()
+  }, [takeSnap])
+
   return {
     stateRef, snap, wsStatus, wsDetail, wsLog, muted,
-    start: doStart, toggleMute, testVoice,
+    start: doStart, toggleMute, testVoice, toggleMusic, nextTrack, setMusicVolume,
     apiConfigured: Boolean(import.meta.env?.VITE_API_URL),
   }
 }

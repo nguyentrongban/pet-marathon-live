@@ -8,6 +8,7 @@ import { createSeqTracker, normalizeEvent, parseCommand } from '../src/game/adap
 import { detectProvince, provinceInfo, provinceRank } from '../src/game/provinces.js'
 import { detectCountry, countryInfo } from '../src/game/countries.js'
 import { detectRegion, regionInfo } from '../src/game/regions.js'
+import { MUSIC_TRACKS, MusicEngine } from '../src/game/music.js'
 import { FPT_COOLDOWN_MS, VOICE_IDS, VOICE_OPTIONS, VoiceEngine, voiceTextBxh, voiceTextFinal, voiceTextGift, voiceTextLikes, voiceTextMatchWin, voiceTextRoundStart, voiceTextRoundWin } from '../src/game/voice.js'
 import {
   DEFAULT_SETTINGS, GiftEngine, MEMBER_TYPES, TEAMS, advance, applyLikes,
@@ -1164,6 +1165,89 @@ await asyncTest('không có giọng Việt thì không đặt lang vi-VN (iPhone
     globalThis.fetch = origFetch
     unmockBrowser()
   }
+})
+
+// ─── Nhạc nền: playlist 6 bài, tự chạy nối nhau, lưu cài đặt ──────────────
+// Giả lập Audio + localStorage cho MusicEngine (Node không có 2 thứ này).
+function mockMusicBrowser() {
+  const store = {}
+  globalThis.Audio = class {
+    constructor() { this.src = ''; this.volume = 1; this.preload = ''; this._listeners = {} }
+    addEventListener(ev, fn) { (this._listeners[ev] ||= []).push(fn) }
+    load() {}
+    play() { return Promise.resolve() }
+    pause() {}
+    _emit(ev) { (this._listeners[ev] || []).forEach((fn) => fn()) }
+  }
+  globalThis.localStorage = {
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => { store[k] = String(v) },
+    removeItem: (k) => { delete store[k] },
+  }
+  return store
+}
+function unmockMusicBrowser() { delete globalThis.Audio; delete globalThis.localStorage }
+
+await asyncTest('nhạc nền: 6 bài dài, phát → qua bài → hết danh sách thì lặp lại', async () => {
+  mockMusicBrowser()
+  try {
+    assert.equal(MUSIC_TRACKS.length, 6, '6 bài nhạc nền')
+    assert.ok(MUSIC_TRACKS.every((t) => t.file.startsWith('/music/') && t.file.endsWith('.mp3')), 'file MP3 trong /music/')
+    assert.ok(MUSIC_TRACKS.every((t) => t.dur && t.title && t.artist), 'mỗi bài có tên + ca sĩ + thời lượng')
+    const m = new MusicEngine()
+    assert.equal(m.current().id, 'dance', 'bài đầu là Dance Music')
+    assert.equal(m.playing, false, 'chưa phát lúc mới tạo')
+    m.play()
+    await sleep(0)
+    assert.equal(m.playing, true, 'play() thì đang phát')
+    m.next()
+    assert.equal(m.current().id, 'phonk', 'qua bài sau là Phonk')
+    assert.equal(m.playing, true, 'qua bài thì vẫn phát')
+    m.next(); m.next(); m.next(); m.next()
+    assert.equal(m.current().id, 'lofi', 'đi hết 5 bài thì tới Lofi')
+    m.next()
+    assert.equal(m.current().id, 'dance', 'hết danh sách thì quay lại bài đầu')
+    m.pause()
+    assert.equal(m.playing, false, 'pause() thì dừng')
+  } finally { unmockMusicBrowser() }
+})
+
+await asyncTest('nhạc nền: hết bài tự chuyển bài sau; tắt nhạc thì dừng; âm lượng kẹp 0-1', async () => {
+  mockMusicBrowser()
+  try {
+    const m = new MusicEngine()
+    m.play()
+    await sleep(0)
+    // Hết bài (sự kiện ended) thì tự qua bài sau.
+    m.audio._emit('ended')
+    assert.equal(m.current().id, 'phonk', 'hết bài thì tự qua bài sau')
+    assert.equal(m.playing, true, 'tự chuyển thì vẫn phát')
+    // Âm lượng kẹp trong 0-1.
+    m.setVolume(2)
+    assert.equal(m.volume, 1, 'âm lượng >1 thì kẹp về 1')
+    m.setVolume(-1)
+    assert.equal(m.volume, 0, 'âm lượng <0 thì kẹp về 0')
+    m.setVolume(0.5)
+    assert.equal(m.volume, 0.5)
+    assert.equal(m.audio.volume, 0.5, 'âm lượng áp vào thẻ audio')
+    // Tắt nhạc thì dừng phát.
+    m.setEnabled(false)
+    assert.equal(m.enabled, false)
+    assert.equal(m.playing, false, 'tắt nhạc thì dừng')
+    // Bật lại thì phát tiếp.
+    m.setEnabled(true)
+    await sleep(0)
+    assert.equal(m.playing, true, 'bật lại thì phát')
+    // Cài đặt được lưu localStorage.
+    const saved = JSON.parse(globalThis.localStorage.getItem('pml-music-v1'))
+    assert.equal(saved.enabled, true)
+    assert.equal(saved.volume, 0.5)
+    assert.equal(saved.index, 1, 'đang ở bài Phonk (index 1)')
+    // Engine mới đọc lại cài đặt đã lưu.
+    const m2 = new MusicEngine()
+    assert.equal(m2.volume, 0.5, 'mở lại vẫn nhớ âm lượng')
+    assert.equal(m2.index, 1, 'mở lại vẫn nhớ bài đang phát')
+  } finally { unmockMusicBrowser() }
 })
 
 

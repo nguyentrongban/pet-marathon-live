@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import {
   BookOpen, Cable, ChevronDown, ChevronUp, Flag, Flame, Gift, Hand, Handshake, Heart,
-  Hourglass, MapPin, MessageCircle, Mic, Package, Pause, Shield, Sparkles, Star, Timer, Trophy,
+  Hourglass, MapPin, MessageCircle, Mic, Music, Package, Pause, Shield, SkipForward, Sparkles, Star, Timer, Trophy,
   User, Users, Volume2, VolumeX, Waves, X, Zap,
 } from 'lucide-react'
 import TugScene from './components/TugScene'
@@ -130,9 +130,27 @@ function DisplayGame() {
             <button className="pml-iconbtn" onClick={game.testVoice} aria-label="Thử giọng đọc" title="Thử giọng đọc">
               <Mic size={20} />
             </button>
+            {/* Nhạc nền: bấm để bật/tắt nhạc nền (6 bài miễn phí, tự chạy nối
+                nhau). Nhạc bắt đầu khi chạm màn hình lần đầu (iOS bắt buộc). */}
+            <button
+              className={`pml-iconbtn ${s?.music?.playing ? 'pml-music-on' : ''}`}
+              onClick={game.toggleMusic}
+              aria-label={s?.music?.playing ? 'Tắt nhạc nền' : 'Bật nhạc nền'}
+              title={s?.music?.playing ? 'Tắt nhạc nền' : 'Bật nhạc nền'}
+            >
+              <Music size={20} />
+            </button>
             {!present && <button className="pml-helpbtn" onClick={() => setGuideOpen(!guideOpen)}><BookOpen size={15} /> Cách chơi</button>}
           </div>
         </div>
+
+        {/* ── Đang phát nhạc nền: tên bài + nút qua bài ── */}
+        {s?.music?.playing && s?.music?.track && (
+          <div className="pml-nowplaying">
+            <Music size={13} /> <span>{s.music.track.title} — {s.music.track.artist}</span>
+            <button className="pml-np-skip" onClick={game.nextTrack} aria-label="Qua bài sau" title="Qua bài sau"><SkipForward size={14} /></button>
+          </div>
+        )}
 
         {/* ── Bảng tỉ số 2 đội ── */}
         <div className="pml-score">

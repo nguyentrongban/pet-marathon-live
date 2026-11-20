@@ -303,6 +303,26 @@ export default function AdminPage() {
             {' '}Nút tắt tiếng trên màn hình chỉ tắt nhạc hiệu ứng, không tắt giọng đọc.
           </p>
           <button className="pml-admin-btn" onClick={() => { postCmd({ cmd: 'testVoice' }); flash('Đã gửi thử giọng đọc lên màn hiển thị — nghe thử xem có tiếng không.') }}>🔊 Thử giọng đọc</button>
+          {/* ── Nhạc nền: 6 bài miễn phí (Pixabay), tự chạy nối nhau. Điều
+               khiển màn hiển thị từ xa: bật/tắt, qua bài, chỉnh to nhỏ. ── */}
+          <h3 className="pml-admin-sub">🎵 Nhạc nền (6 bài miễn phí, tự chạy nối nhau)</h3>
+          <p className="pml-admin-note">
+            {snap?.music?.track
+              ? <>Đang phát: <b>{snap.music.track.title} — {snap.music.track.artist}</b> ({snap.music.track.dur}) {snap.music.playing ? '· đang chạy' : '· đang dừng'}</>
+              : 'Chưa phát nhạc — nhạc bắt đầu khi chạm màn hình lần đầu (iPhone bắt buộc có cử chỉ) hoặc bấm nút nhạc.'}
+          </p>
+          <div className="pml-admin-btns">
+            <button className="pml-admin-btn" onClick={() => { postCmd({ cmd: 'musicToggle' }); flash(snap?.music?.playing ? 'Đã tắt nhạc nền.' : 'Đã bật nhạc nền.') }}>
+              {snap?.music?.playing ? '⏸ Tắt nhạc nền' : '▶ Bật nhạc nền'}
+            </button>
+            <button className="pml-admin-btn" onClick={() => { postCmd({ cmd: 'musicNext' }); flash('Đã qua bài nhạc sau.') }}>⏭ Qua bài sau</button>
+          </div>
+          <label className="pml-admin-field">Âm lượng nhạc nền
+            <input
+              type="range" min="0" max="100" value={Math.round((snap?.music?.volume ?? 0.4) * 100)}
+              onChange={(e) => postCmd({ cmd: 'musicVolume', volume: Number(e.target.value) / 100 })}
+            />
+          </label>
           <p className="pml-admin-note">
             API lưu kết quả:{' '}{import.meta.env?.VITE_API_URL ? 'đã gắn địa chỉ.' : 'chưa gắn — kết quả trận chỉ hiện trên màn hình, không lưu lên mạng.'}
           </p>
