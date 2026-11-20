@@ -586,25 +586,34 @@ export default function TugScene({ liveRef }) {
     for (let i = 0; i < 6; i++) flagSpots.push({ x: -12 + i * 4.8, z: -10, ry: (i % 2 ? Math.PI : 0) })
     placeEnv('/track/quaternius-flag.glb', flagSpots)
     // ── Bảng tên tỉnh: 3 tỉnh tặng quà nhiều nhất, tên viết lên bảng treo
-    // trên cột sau hố bùn, cao hơn đầu người để nhìn rõ từ xa. Bảng của
+    // trên cột sau hố bùn, cao hơn đầu người để nhìn rõ từ xa. Bảng vàng
+    // dẫn đầu lùi ra phía sau xa (giữa xa) nhưng TO và nổi bật; 2 bảng sau
+    // to ra, đặt đúng 2 bên (trái/phải) để dễ phân biệt 2 bên. Bảng của
     // tỉnh dẫn đầu nền vàng, 2 bảng sau nền xanh đậm — đổi bảng khi BXH
     // tỉnh thành đổi.
+    // (x, z, rộng, cao, cao tâm bảng, cao cột) theo từng vị trí.
+    const bannerDefs = [
+      { x: 0, z: -10, w: 3.2, h: 1.2, cy: 2.8, poleH: 3.2 },    // vàng: dẫn đầu, sau xa, to
+      { x: -5.0, z: -5, w: 2.4, h: 0.9, cy: 2.6, poleH: 2.9 },  // bên trái (cao hơn đầu người, trong khung hình)
+      { x: 5.0, z: -5, w: 2.4, h: 0.9, cy: 2.6, poleH: 2.9 },   // bên phải (cao hơn đầu người, trong khung hình)
+    ]
     const provinceBannerSlots = []
     for (let i = 0; i < 3; i++) {
+      const d = bannerDefs[i]
       const grp = new THREE.Group()
-      grp.position.set((i - 1) * 3.2, 0, -5)
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.2, 6), mat(0x495057))
-      pole.position.y = 1.1
+      grp.position.set(d.x, 0, d.z)
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, d.poleH, 6), mat(0x495057))
+      pole.position.y = d.poleH / 2
       grp.add(pole)
       const canvas = document.createElement('canvas')
       canvas.width = 256; canvas.height = 96
       const tex = new THREE.CanvasTexture(canvas)
       tex.colorSpace = THREE.SRGBColorSpace
       const cloth = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.6, 0.6),
+        new THREE.PlaneGeometry(d.w, d.h),
         new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide }),
       )
-      cloth.position.set(0, 1.95, 0)
+      cloth.position.set(0, d.cy, 0)
       grp.add(cloth)
       grp.visible = false
       scene.add(grp)
