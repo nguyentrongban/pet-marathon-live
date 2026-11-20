@@ -342,7 +342,7 @@ input, select { font-family: inherit; }
 
 /* ── Lật kèo: 1 món quà mạnh hơn cả đội kia — hiện to giữa màn hình 2,5 giây ── */
 .pml-flip {
-  position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); z-index: 8;
+  position: absolute; top: auto; bottom: 15%; left: 50%; transform: translate(-50%, -50%); z-index: 8;
   background: linear-gradient(90deg, #0ea5e9, #2563eb); color: #fff;
   border: 2px solid rgba(255,255,255,.8); border-radius: 14px; padding: 8px 12px;
   font-size: 14px; font-weight: 900; text-align: center; line-height: 1.35;
