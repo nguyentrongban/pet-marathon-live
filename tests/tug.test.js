@@ -2,7 +2,8 @@
 // Test logic thuần (không cần framework): chạy bằng `node tests/tug.test.js`
 // hoặc `npm test`. Mỗi test là 1 hàm assert, in PASS/FAIL rồi tổng kết.
 // LUẬT v2: thành viên = +1 lực kéo liên tục · quà = bùng lực (99 xu = 100,
-// bằng 100 người, tắt dần) · tim = +thời gian (cả phòng đủ 100 tim → +10s).
+// bằng 100 người, tắt dần) · tim = +lực kéo (cả phòng đủ 100 tim → +10 lực
+// cho đội của người thả tim đó, tối đa +60 lực/màn).
 import assert from 'node:assert'
 import { createSeqTracker, normalizeEvent, parseCommand } from '../src/game/adapter.js'
 import { detectProvince, provinceInfo, provinceRank } from '../src/game/provinces.js'
@@ -58,7 +59,7 @@ test('mỗi người vào đội là +1 lực kéo liên tục', () => {
 
 test('đội đông người kéo thắng đội ít người (không cần quà)', () => {
   const s = crowdMatch(10, 1)
-  step(s, 10)
+  step(s, 15) // dây chậm (0,08/giây) nên 10 đấu 1 cần ~12 giây mới tới vạch thắng
   assert.equal(s.phase, 'roundEnd', 'đội 10 người phải thắng màn')
   assert.equal(s.roundWinner, 'A')
   assert.equal(s.teams.A.roundWins, 1)
@@ -200,51 +201,53 @@ test('hết giờ: đội dẫn trước thắng, dây ở giữa thì hòa', ()
   assert.equal(s2.roundWinner, null, 'dây gần giữa thì hòa')
 })
 
-// ── 7. Thả tim = +thời gian (cộng dồn CẢ PHÒNG) ───────────────────────────
-test('cả phòng đủ 100 tim thì màn kéo dài thêm 10 giây, tim không kéo dây', () => {
+// ── 7. Thả tim = +lực kéo (cộng dồn CẢ PHÒNG) ───────────────────────────
+test('cả phòng đủ 100 tim thì +10 lực kéo cho đội của người thả tim', () => {
   const s = freshMatch()
   s.rope = 0.4
-  const n = applyLikes(s, 'user1', 100)
+  const n = applyLikes(s, 'lan', 100) // Lan ở đội A
   assert.equal(n, 1)
-  assert.ok(approx(s.roundTimeLeft, 55), `phải +10s thành 55, được ${s.roundTimeLeft}`)
-  assert.equal(s.timeAddedByLikes, 10)
+  assert.ok(approx(s.teams.A.boost, 10), `đội A phải +10 lực, được ${s.teams.A.boost}`)
+  assert.equal(s.likePowerAdded, 10)
   assert.equal(s.likes, 100)
-  assert.ok(approx(s.rope, 0.4), 'tim không được đẩy dây')
-  const n2 = applyLikes(s, 'user1', 250)
-  assert.equal(n2, 2, '250 tim = 2 lần +10s, còn dư 50')
-  assert.ok(approx(s.roundTimeLeft, 75))
-  assert.equal(s.timeAddedByLikes, 30)
+  assert.ok(approx(s.roundTimeLeft, 45), 'tim không cộng giờ nữa')
+  assert.ok(approx(s.rope, 0.4), 'tim không đẩy dây ngay (chỉ +lực, dây chạy theo lực)')
+  const n2 = applyLikes(s, 'lan', 250)
+  assert.equal(n2, 2, '250 tim = 2 lần +10 lực, còn dư 50')
+  assert.ok(approx(s.teams.A.boost, 30))
+  assert.equal(s.likePowerAdded, 30)
   assert.equal(s.likes, 350)
-  const n3 = applyLikes(s, 'user1', 50)
-  assert.equal(n3, 1, '50 dư + 50 mới = đủ 100 → +10s nữa')
-  assert.ok(approx(s.roundTimeLeft, 85))
+  const n3 = applyLikes(s, 'lan', 50)
+  assert.equal(n3, 1, '50 dư + 50 mới = đủ 100 → +10 lực nữa')
+  assert.ok(approx(s.teams.A.boost, 40))
 })
 
 test('tim cộng dồn cả phòng: 60 + 60 của 2 người cũng đủ 100', () => {
   const s = freshMatch()
-  assert.equal(applyLikes(s, 'user1', 60), 0, 'mới 60 tim → chưa đủ')
-  assert.equal(applyLikes(s, 'user2', 60), 1, '60+60=120 → đủ 100, +10s, còn dư 20')
-  assert.ok(approx(s.roundTimeLeft, 55), 'cộng dồn cả phòng phải +10s')
+  assert.equal(applyLikes(s, 'lan', 60), 0, 'mới 60 tim → chưa đủ')
+  assert.equal(applyLikes(s, 'minh', 60), 1, '60+60=120 → đủ 100, +10 lực cho đội B (Minh thả), còn dư 20')
+  assert.ok(approx(s.teams.B.boost, 10), 'đội B phải +10 lực vì Minh ở đội B')
   assert.equal(s.likes, 120, 'tổng tim vẫn đếm')
-  assert.equal(applyLikes(s, 'user3', 80), 1, '20 dư + 80 = đủ 100 → +10s nữa')
+  assert.equal(applyLikes(s, 'lan', 80), 1, '20 dư + 80 = đủ 100 → +10 lực cho đội A nữa')
+  assert.ok(approx(s.teams.A.boost, 10))
 })
 
-test('tim cộng tối đa +60 giây / màn', () => {
+test('tim cộng tối đa +60 lực kéo / màn', () => {
   const s = freshMatch()
-  const n = applyLikes(s, 'user1', 1000)
-  assert.equal(n, 6, '1000 tim = 10 lần nhưng cắt ở +60s (6 lần)')
-  assert.equal(s.timeAddedByLikes, 60)
-  assert.ok(approx(s.roundTimeLeft, 105))
-  assert.equal(applyLikes(s, 'user1', 500), 0, 'đủ +60s rồi thì tim nữa cũng không cộng')
+  const n = applyLikes(s, 'lan', 1000)
+  assert.equal(n, 6, '1000 tim = 10 lần nhưng cắt ở +60 lực (6 lần)')
+  assert.equal(s.likePowerAdded, 60)
+  assert.ok(approx(s.teams.A.boost, 60))
+  assert.equal(applyLikes(s, 'lan', 500), 0, 'đủ +60 lực rồi thì tim nữa cũng không cộng')
 })
 
-test('tim ngoài lúc kéo không cộng giờ (nhưng vẫn đếm tổng)', () => {
+test('tim ngoài lúc kéo không cộng lực (nhưng vẫn đếm tổng)', () => {
   const s = createMatch({ ...DEFAULT_SETTINGS, giftMap: { ...DEFAULT_SETTINGS.giftMap } })
   startMatch(s) // đang đếm ngược, chưa kéo
   assert.equal(s.phase, 'countdown')
   assert.equal(applyLikes(s, 'user1', 100), 0)
   assert.equal(s.likes, 100)
-  assert.ok(approx(s.roundTimeLeft, 45), 'chưa kéo thì không cộng giờ')
+  assert.ok(approx(s.roundTimeLeft, 45), 'chưa kéo thì không cộng lực')
 })
 
 // ── 8. Vào đội ─────────────────────────────────────────────────────────────
@@ -522,7 +525,7 @@ test('BXH quà: người chưa vào đội vẫn được ghi (tặng quà là l
 
 test('BXH tim: ghi tổng tim từng người (cả khi chưa vào màn kéo)', () => {
   const s = createMatch({ ...DEFAULT_SETTINGS, giftMap: { ...DEFAULT_SETTINGS.giftMap } })
-  applyLikes(s, 'lan', 30, 'Lan') // chưa vào màn kéo: không +giờ nhưng vẫn đếm tổng
+  applyLikes(s, 'lan', 30, 'Lan') // chưa vào màn kéo: không +lực nhưng vẫn đếm tổng
   assert.equal(s.likes, 30)
   const top0 = topLikers(s, 3)
   assert.equal(top0[0].nickname, 'Lan')
@@ -949,7 +952,7 @@ test('câu đọc thắng / đầu màn / giờ chót / tim / BXH', () => {
   assert.equal(voiceTextMatchWin('TP. Hồ Chí Minh'), 'TP. Hồ Chí Minh vô địch trận đấu!')
   assert.equal(voiceTextRoundStart(1, 'Hà Nội', 'TP. Hồ Chí Minh'), 'Màn 1 bắt đầu! Hà Nội đấu với TP. Hồ Chí Minh!')
   assert.equal(voiceTextFinal(), 'Giờ chót! Mười giây cuối, quà tặng nhân đôi!')
-  assert.equal(voiceTextLikes(10), 'Đủ một trăm tim, cộng thêm 10 giây!')
+  assert.equal(voiceTextLikes(10), 'Đủ một trăm tim, cộng thêm 10 lực kéo!')
   assert.equal(voiceTextBxh({ name: 'Hà Nội', power: 153 }, { nickname: 'Bạn Tặng Thử', power: 100 }), 'Bảng xếp hạng: Hà Nội dẫn đầu với 153 lực. Bạn Tặng Thử tặng nhiều nhất, 100 lực.')
   assert.equal(voiceTextBxh({ name: 'Hà Nội', power: 153 }, null), 'Bảng xếp hạng: Hà Nội dẫn đầu với 153 lực.')
   assert.equal(voiceTextBxh(null, null), '')

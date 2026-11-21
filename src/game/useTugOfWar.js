@@ -68,7 +68,11 @@ export function loadSettings() {
     // lâu hơn, gay cấn hơn; 0,9 thì xa quá, hay phải chờ hết giờ).
     // Máy nào còn lưu giá trị mặc định cũ (0,9 hoặc 0,5) thì đổi sang 0,7.
     if (saved.winLine === 0.9 || saved.winLine === 0.5) saved.winLine = 0.7
-    if (saved.ropeSpeed === 0.12) saved.ropeSpeed = 0.15
+    // Đổi luật 2026-11-21: dây chạy chậm lại 0,15 → 0,08 để có thời gian
+    // tặng quà, câu giờ (2 đấu 1 thắng quá nhanh). Máy nào còn lưu tốc độ
+    // mặc định cũ (0,12 hoặc 0,15) thì đổi sang 0,08; ai chỉnh tay khác
+    // thì giữ nguyên lựa chọn của họ.
+    if (saved.ropeSpeed === 0.12 || saved.ropeSpeed === 0.15) saved.ropeSpeed = 0.08
     return {
       ...DEFAULT_SETTINGS,
       ...saved,
@@ -194,7 +198,7 @@ export function useTugOfWar() {
       teamCounts: { A: s.teams.A.members.length, B: s.teams.B.members.length },
       roundWinner: s.roundWinner, matchWinner: s.matchWinner,
       luckyStar: s.luckyStar, streak: { ...s.streak },
-      finalTime: !!s.finalTime, timeAddedByLikes: s.timeAddedByLikes || 0,
+      finalTime: !!s.finalTime, likePowerAdded: s.likePowerAdded || 0,
       feed: s.feed.slice(-8),
       floaters: [...s.floaters],
       effects: [...s.effects],
@@ -228,7 +232,7 @@ export function useTugOfWar() {
         B: { roundWins: s.teams.B.roundWins, totalPull: s.teams.B.totalPull, pullRate: s.teams.B.pullRate, boost: s.teams.B.boost, members: s.teams.B.members.map((m) => ({ nickname: m.nickname, pulls: m.pulls, gifts: m.gifts })) },
       },
       roundWinner: s.roundWinner, matchWinner: s.matchWinner,
-      streak: { ...s.streak }, finalTime: !!s.finalTime, timeAddedByLikes: s.timeAddedByLikes || 0,
+      streak: { ...s.streak }, finalTime: !!s.finalTime, likePowerAdded: s.likePowerAdded || 0,
       feed: s.feed.slice(-8), stats: s.stats, likes: s.likes,
       bxh: { gifters: topGifters(s, 3), likers: topLikers(s, 3), provinces: topProvinces(s, 3) },
       provinceLeader: provinceLeader(s),
@@ -317,12 +321,13 @@ export function useTugOfWar() {
     }
 
     if (ev.kind === 'like') {
-      // Tim chỉ +thời gian kéo (tính theo từng người: đủ 100 tim → +10s).
-      // BXH tim ghi tên người thả để bảng nhỏ ở góc trái có người đứng đầu.
+      // Tim cũng kéo dây (cả phòng đủ 100 tim → +10 lực kéo cho đội của
+      // người thả tim đó). BXH tim ghi tên người thả để bảng nhỏ ở góc
+      // trái có người đứng đầu.
       const added = applyLikes(s, ev.userId, ev.likeCount, ev.nickname, ev.avatar || '')
       if (added > 0) {
         sound.coin()
-        voiceRef.current.speak(voiceTextLikes(added * (s.settings.likeTimeSeconds || 10)), 'low')
+        voiceRef.current.speak(voiceTextLikes(added * (s.settings.likePower || 10)), 'low')
       }
       takeSnap()
       return

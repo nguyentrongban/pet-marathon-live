@@ -190,14 +190,14 @@ export default function AdminPage() {
             <label className="pml-admin-field">Lượt kéo toàn trận: cách nhau ít nhất (giây)
               <input type="number" min="0" max="5" step="0.5" defaultValue={settings.globalPullIntervalSec} onBlur={(e) => updateSettings({ globalPullIntervalSec: Math.max(0, Number(e.target.value) || 0.5) })} />
             </label>
-            <label className="pml-admin-field">Tim: 1 người thả đủ bao nhiêu tim thì +thời gian
-              <input type="number" min="10" max="1000" defaultValue={settings.likeTimeEvery} onBlur={(e) => updateSettings({ likeTimeEvery: Math.max(10, Number(e.target.value) || 100) })} />
+            <label className="pml-admin-field">Tim: cả phòng đủ bao nhiêu tim thì +lực kéo
+              <input type="number" min="10" max="1000" defaultValue={settings.likePowerEvery} onBlur={(e) => updateSettings({ likePowerEvery: Math.max(10, Number(e.target.value) || 100) })} />
             </label>
-            <label className="pml-admin-field">Mỗi lần đủ tim thì +bao nhiêu giây kéo
-              <input type="number" min="1" max="60" defaultValue={settings.likeTimeSeconds} onBlur={(e) => updateSettings({ likeTimeSeconds: Math.max(1, Number(e.target.value) || 10) })} />
+            <label className="pml-admin-field">Mỗi lần đủ tim thì +bao nhiêu lực kéo
+              <input type="number" min="1" max="60" defaultValue={settings.likePower} onBlur={(e) => updateSettings({ likePower: Math.max(1, Number(e.target.value) || 10) })} />
             </label>
-            <label className="pml-admin-field">Tối đa +bao nhiêu giây / màn (do tim)
-              <input type="number" min="0" max="300" defaultValue={settings.likeTimeMaxBonus} onBlur={(e) => updateSettings({ likeTimeMaxBonus: Math.max(0, Number(e.target.value) || 60) })} />
+            <label className="pml-admin-field">Tối đa +bao nhiêu lực kéo / màn (do tim)
+              <input type="number" min="0" max="300" defaultValue={settings.likePowerMax} onBlur={(e) => updateSettings({ likePowerMax: Math.max(0, Number(e.target.value) || 60) })} />
             </label>
             <label className="pml-admin-field">Giờ chót: bắt đầu khi còn (giây)
               <input type="number" min="0" max="30" defaultValue={settings.finalSeconds} onBlur={(e) => updateSettings({ finalSeconds: Math.max(0, Number(e.target.value) || 10) })} />
@@ -206,7 +206,7 @@ export default function AdminPage() {
               <input type="number" min="1" max="5" step="0.5" defaultValue={settings.finalGiftMult} onBlur={(e) => updateSettings({ finalGiftMult: Math.max(1, Number(e.target.value) || 2) })} />
             </label>
             <label className="pml-admin-field">Tốc độ dây tối đa (khi 1 đội áp đảo hoàn toàn)
-              <input type="number" min="0.02" max="0.5" step="0.01" defaultValue={settings.ropeSpeed} onBlur={(e) => updateSettings({ ropeSpeed: Math.max(0.02, Number(e.target.value) || 0.12) })} />
+              <input type="number" min="0.02" max="0.5" step="0.01" defaultValue={settings.ropeSpeed} onBlur={(e) => updateSettings({ ropeSpeed: Math.max(0.02, Number(e.target.value) || 0.08) })} />
             </label>
             <label className="pml-admin-field">Cơ hội cuối: đội thua quá (0–1) thì nhân đôi lực kéo
               <input type="number" min="0.1" max="0.95" step="0.05" defaultValue={settings.comebackAt} onBlur={(e) => updateSettings({ comebackAt: Math.min(0.95, Math.max(0.1, Number(e.target.value) || 0.55)) })} />

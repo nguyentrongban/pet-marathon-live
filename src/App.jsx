@@ -211,9 +211,9 @@ function DisplayGame() {
           <div className="pml-flip"><Waves size={22} /> LẬT KÈO! {(s.effects.find((e) => e.kind === 'flip') || {}).sender || 'Ai đó'} 1 món quà cân cả đội kia!</div>
         )}
 
-        {/* ── Tim cộng giờ: +10s hiện nhỏ dưới đồng hồ ── */}
-        {phase === 'pulling' && (s?.effects || []).some((e) => e.kind === 'time') && (
-          <div className="pml-timeflash"><Heart size={15} fill="currentColor" /> +10s kéo co!</div>
+        {/* ── Tim cộng lực kéo: +10 lực hiện nhỏ dưới đồng hồ ── */}
+        {phase === 'pulling' && (s?.effects || []).some((e) => e.kind === 'like') && (
+          <div className="pml-timeflash"><Heart size={15} fill="currentColor" /> +{(s.effects.find((e) => e.kind === 'like') || {}).power || 10} lực kéo!</div>
         )}
 
         {/* ── Ai vào xem / theo dõi / chia sẻ: hiện 2 giây rồi mất ── */}
@@ -410,8 +410,8 @@ function DisplayGame() {
               <div className="pml-wait-row">
                 <Heart size={15} fill="currentColor" />
                 <div>
-                  <b>100 tim = +10 giây kéo</b>
-                  <span>100 likes = +10s pulling time</span>
+                  <b>100 tim = +10 lực kéo</b>
+                  <span>100 likes = +10 pulling power</span>
                 </div>
               </div>
               <div className="pml-wait-go"><Hand size={16} /> Chạm màn hình để bắt đầu · Tap screen to start!</div>
@@ -449,7 +449,7 @@ function DisplayGame() {
             <p><MessageCircle size={14} /> Bình luận <b>tên tỉnh của bạn</b> (Hà Nội, Sài Gòn, Đà Nẵng...) — tự vào đội tỉnh đó luôn! <b>2 tỉnh có nhiều người bình luận nhất sẽ thành 2 đội kéo nhau</b> ở mỗi màn (màn sau chọn lại 2 tỉnh đông nhất). Mỗi người vào đội là <b>+1 lực kéo liên tục</b> — tỉnh đông người kéo mạnh hơn! (Bình luận <b>A</b>/<b>B</b> để vào đội bên trái/phải, hoặc tên người: Anh Hùng/Miyo/Mia = trái, Lan/Hương/Bình = phải.)</p>
             <p><Gift size={14} /> Tặng quà — quà là cú bùng sức mạnh: hoa hồng 1 xu = 1 lực · hạc giấy 99 xu = <b>100 lực, bằng 100 người!</b> Quà to có thể kéo ngang cả đội đông. Quà to (≥25 lực) thì có <b>thùng tiếp tế thả dù</b> rơi xuống!</p>
             <p><MapPin size={14} /> Tỉnh thành — quà tặng được tính cho tỉnh của người tặng, tỉnh dẫn đầu BXH quà được thưởng <b>×1,5 lực kéo</b>. Tỉnh còn có <b>hạng Free Fire</b> theo tổng lực quà: Đồng → Bạc → Vàng → Bạch Kim → Kim Cương → Huyền Thoại → Đại Kiện Tướng — tặng quà để đưa tỉnh mình lên hạng cao!</p>
-            <p><Heart size={14} fill="currentColor" /> Thả tim — <b>1 người thả đủ 100 tim thì màn kéo dài thêm 10 giây</b> (tối đa +60 giây). Tim không kéo dây, chỉ thêm giờ!</p>
+            <p><Heart size={14} fill="currentColor" /> Thả tim — <b>cả phòng thả đủ 100 tim thì đội của người thả tim đó được +10 lực kéo</b> (tối đa +60 lực/màn). Tim cũng kéo dây!</p>
             <p><Zap size={14} /> Đội đang thua quá nửa đường được nhân đôi lực kéo (cơ hội cuối). <b>10 giây cuối: quà tặng ×2!</b></p>
             <p><Trophy size={14} /> Thắng 2 màn trước thì vô địch trận (best of 3 — tối đa 3 màn, 2–1 là vô địch). Đội thắng màn được ngôi sao may mắn ở màn sau!</p>
           </div>

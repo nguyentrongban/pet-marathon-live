@@ -257,65 +257,68 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath()
 }
 // Bảng tên trên đầu: nền màu đội, chữ trắng. Vẽ lại khi đổi người.
+// To (1,6m) để đọc được trên điện thoại — trước đây 1,0m nhỏ quá không thấy.
 function makeNameSprite(teamColorHex) {
   const canvas = document.createElement('canvas')
-  canvas.width = 256
-  canvas.height = 64
+  canvas.width = 384
+  canvas.height = 96
   const ctx = canvas.getContext('2d')
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }))
-  sprite.scale.set(1.0, 0.25, 1)
+  sprite.scale.set(1.6, 0.4, 1)
   sprite.position.y = 1.98
   const draw = (name) => {
     const label = String(name || 'Khán giả').slice(0, 14)
-    ctx.clearRect(0, 0, 256, 64)
+    ctx.clearRect(0, 0, 384, 96)
     ctx.fillStyle = `#${teamColorHex.toString(16).padStart(6, '0')}e6`
-    roundRect(ctx, 4, 6, 248, 52, 26)
+    roundRect(ctx, 6, 9, 372, 78, 39)
     ctx.fill()
     ctx.strokeStyle = 'rgba(255,255,255,0.85)'
-    ctx.lineWidth = 3
-    roundRect(ctx, 4, 6, 248, 52, 26)
+    ctx.lineWidth = 4
+    roundRect(ctx, 6, 9, 372, 78, 39)
     ctx.stroke()
     ctx.fillStyle = '#fff'
-    ctx.font = '900 30px system-ui, sans-serif'
+    ctx.font = '900 44px system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(label, 128, 34)
+    ctx.fillText(label, 192, 51)
     texture.needsUpdate = true
   }
   return { sprite, draw }
 }
 // Ảnh đại diện tròn trên đầu: có URL thì tải ảnh thật, không có / tải lỗi
 // thì vẽ vòng tròn màu + chữ cái đầu tên (vẫn nhận ra là ai).
+// To (0,72m) và rõ hơn — trước đây 0,52m nhỏ, chữ cái khó thấy.
 function makeAvatarSprite() {
+  const S = 160
   const canvas = document.createElement('canvas')
-  canvas.width = 128
-  canvas.height = 128
+  canvas.width = S
+  canvas.height = S
   const ctx = canvas.getContext('2d')
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }))
-  sprite.scale.set(0.52, 0.52, 1)
-  sprite.position.y = 2.42
+  sprite.scale.set(0.72, 0.72, 1)
+  sprite.position.y = 2.55
   const drawFallback = (name) => {
     const color = colorFromName(name)
-    ctx.clearRect(0, 0, 128, 128)
+    ctx.clearRect(0, 0, S, S)
     ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`
     ctx.beginPath()
-    ctx.arc(64, 64, 62, 0, Math.PI * 2)
+    ctx.arc(S / 2, S / 2, S / 2 - 2, 0, Math.PI * 2)
     ctx.fill()
     ctx.strokeStyle = 'rgba(255,255,255,0.9)'
-    ctx.lineWidth = 5
+    ctx.lineWidth = 6
     ctx.beginPath()
-    ctx.arc(64, 64, 60, 0, Math.PI * 2)
+    ctx.arc(S / 2, S / 2, S / 2 - 4, 0, Math.PI * 2)
     ctx.stroke()
     const initial = String(name || '?').trim().charAt(0).toUpperCase() || '?'
     ctx.fillStyle = '#fff'
-    ctx.font = '900 64px system-ui, sans-serif'
+    ctx.font = `900 ${Math.round(S * 0.5)}px system-ui, sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(initial, 64, 68)
+    ctx.fillText(initial, S / 2, S / 2 + 4)
     texture.needsUpdate = true
   }
   const loader = new THREE.TextureLoader()
@@ -327,18 +330,18 @@ function makeAvatarSprite() {
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       // Cắt ảnh thành hình tròn (ảnh TikTok là hình vuông).
-      ctx.clearRect(0, 0, 128, 128)
+      ctx.clearRect(0, 0, S, S)
       ctx.save()
       ctx.beginPath()
-      ctx.arc(64, 64, 62, 0, Math.PI * 2)
+      ctx.arc(S / 2, S / 2, S / 2 - 2, 0, Math.PI * 2)
       ctx.clip()
       const side = Math.min(img.width, img.height)
-      ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 128, 128)
+      ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, S, S)
       ctx.restore()
       ctx.strokeStyle = 'rgba(255,255,255,0.9)'
-      ctx.lineWidth = 5
+      ctx.lineWidth = 6
       ctx.beginPath()
-      ctx.arc(64, 64, 60, 0, Math.PI * 2)
+      ctx.arc(S / 2, S / 2, S / 2 - 4, 0, Math.PI * 2)
       ctx.stroke()
       texture.needsUpdate = true
     }
@@ -1729,17 +1732,19 @@ export default function TugScene({ liveRef }) {
         // lúc quay cận. Người kéo theo dây (smoothRopeX) nên cộng vào.
         // Quà to thì cam lại gần + thấp hơn (khác biệt, đẹp hơn, gần mặt
         // hơn để thấy rõ cảm xúc) — quà nhỏ thì giữ khoảng cách thường.
-        // Ngắm cao (y=1,7, ngang đầu) để tên + avatar trên đầu nhân vật
+        // Ngắm cao (y=1,85, ngang đầu) để tên + avatar trên đầu nhân vật
         // lọt vào giữa khung hình (ô trống của bùn dính ống kính) — ngắm
         // thấp (ngang hông) thì avatar bị đẩy lên mép trên, bùn che mất.
+        // (Tên/avatar vừa to lên: tên 1,6m, avatar đỉnh 2,91m nên ngắm
+        // cao hơn trước 1,7 để cả hai lọt khung.)
         const dir = giftCam.teamId === 'A' ? 1 : -1
         const mx = spot.x + smoothRopeX
         if (giftCam.big) {
           tmpCamPos.set(mx + dir * 1.8, 1.7, spot.z + 3.2)
-          tmpLook.set(mx, 1.7, spot.z)
+          tmpLook.set(mx, 1.85, spot.z)
         } else {
           tmpCamPos.set(mx + dir * 2.2, 2.0, spot.z + 4.2)
-          tmpLook.set(mx, 1.7, spot.z)
+          tmpLook.set(mx, 1.85, spot.z)
         }
       } else if ((phase === 'roundEnd' || phase === 'matchEnd') && loserTeam) {
         const endElapsed = now - roundEndStart

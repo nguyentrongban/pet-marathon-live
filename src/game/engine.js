@@ -2,13 +2,13 @@
 // Logic thuần của game kéo co 2 đội trên TikTok LIVE. KHÔNG dùng React/Three/DOM
 // nên chạy được trực tiếp bằng `node tests/tug.test.js`.
 // Thời gian trong engine tính bằng giây (state.now).
-// LUẬT CHƠI (v2 — số đông vs tiền quà, tim = thời gian):
+// LUẬT CHƠI (v2 — số đông vs tiền quà, tim = lực kéo):
 // · Mỗi người bình luận A/B vào đội là +1 lực kéo LIÊN TỤC cho đội đó —
 //   đội đông người kéo mạnh hơn, 100 người thì đội 1 người chắc chắn thua.
 // · Quà tặng là cú BÙNG sức mạnh (tắt dần sau vài giây): hạc giấy 99 xu =
 //   100 lực, bằng 100 người — 1 món quà to đủ để kéo ngang đội đông.
-// · Thả tim KHÔNG kéo dây nữa: 1 người thả đủ 100 tim thì màn kéo dài
-//   thêm 10 giây (tối đa +60 giây/màn).
+// · Thả tim CŨNG kéo dây: cả phòng thả đủ 100 tim thì đội của người thả
+//   tim đó được +10 lực kéo (tối đa +60 lực/màn).
 // · Đội thua quá nửa đường được ×2 (cơ hội cuối); 10 giây cuối quà ×2
 //   (giờ chót). Thắng 2 màn trước thì vô địch trận (best of 3 — tối đa 3
 //   màn, 2–1 là vô địch), chuỗi thắng giữ qua trận.
@@ -165,15 +165,15 @@ export const DEFAULT_SETTINGS = {
   countdownSeconds: 3,
   winsToMatch: 2,            // thắng 2 màn trước thì thắng trận (best of 3 — tối đa 3 màn)
   winLine: 0.7,              // vạch giữa chạm ±0,7 (cờ chạy qua ~84% thước) là thắng màn ngay — xa hơn 0,5 để màn kéo lâu hơn, gay cấn hơn (0,9 thì xa quá, hay phải chờ hết giờ)
-  ropeSpeed: 0.15,           // tốc độ vạch giữa tối đa — 1 phe áp đảo hoàn toàn thì vạch chạy 0,15/giây
+  ropeSpeed: 0.08,           // tốc độ vạch giữa tối đa — 1 phe áp đảo hoàn toàn thì vạch chạy 0,08/giây (chậm để có thời gian tặng quà, câu giờ)
   ropeDecay: 0.02,           // dây tự trôi nhẹ về giữa 2%/giây
   boostDecay: 0.2,           // quà tặng tắt dần — bùng lực giảm một nửa sau ~3,5 giây
   comebackAt: 0.55,          // đội thua quá 0,55 thì vào "cơ hội cuối"
   comebackMult: 2,           // ... quà của đội thua nhân đôi lực kéo
   globalPullIntervalSec: 0.5, // tối đa 1 lượt kéo / 0,5 giây toàn trận (còn lại xếp hàng)
-  likeTimeEvery: 100,        // 1 người thả đủ 100 tim → +thời gian kéo
-  likeTimeSeconds: 10,       // ... +10 giây
-  likeTimeMaxBonus: 60,      // ... tối đa +60 giây / màn
+  likePowerEvery: 100,        // cả phòng thả đủ 100 tim → +lực kéo cho đội của người thả tim đó
+  likePower: 10,              // ... +10 lực kéo
+  likePowerMax: 60,           // ... tối đa +60 lực kéo / màn (do tim)
   finalSeconds: 10,          // 10 giây cuối là "giờ chót"
   finalGiftMult: 2,          // ... quà tặng trong giờ chót nhân đôi lực kéo
   provinceLeaderMult: 1.5,    // tỉnh dẫn đầu BXH tỉnh thành: quà của tỉnh đó ×1,5 lực kéo
@@ -188,10 +188,11 @@ export const BALANCE_NOTE =
   'Cân bằng: mỗi người vào đội là +1 lực kéo liên tục — đội đông người ' +
   'kéo mạnh hơn, 100 người thì đội 1 người chắc chắn thua. Quà tặng là cú ' +
   'bùng sức mạnh (tắt dần sau vài giây): hạc giấy 99 xu = 100 lực, bằng ' +
-  '100 người — 1 món quà to đủ để kéo ngang đội đông. Tim không kéo dây ' +
-  'nữa: 1 người thả đủ 100 tim thì màn kéo dài thêm 10 giây (tối đa +60 ' +
-  'giây/màn). 10 giây cuối quà ×2, đội thua quá nửa đường cũng ×2 (cơ hội ' +
-  'cuối), nên màn nào cũng có thể lật kèo vào phút chót.'
+  '100 người — 1 món quà to đủ để kéo ngang đội đông. Tim cũng kéo dây: ' +
+  'cả phòng thả đủ 100 tim thì đội của người thả tim đó được +10 lực kéo ' +
+  '(tối đa +60 lực/màn). Dây chạy chậm (tối đa 0,08/giây) để có thời gian ' +
+  'tặng quà, câu giờ. 10 giây cuối quà ×2, đội thua quá nửa đường cũng ×2 ' +
+  '(cơ hội cuối), nên màn nào cũng có thể lật kèo vào phút chót.'
 
 // ─── Trạng thái trận đấu ────────────────────────────────────────────────────
 let uidCounter = 1
@@ -222,7 +223,7 @@ export function createMatch(settings = DEFAULT_SETTINGS) {
     luckyStar: null, // { team } — đội thắng màn trước được bắt đầu màn sau lệch 0,12 về phía mình
     streak: { A: 0, B: 0 }, // chuỗi thắng trận liên tiếp của mỗi đội (giữ qua trận)
     feed: [], floaters: [], effects: [],
-    likes: 0, likesInRound: 0, timeAddedByLikes: 0, finalTime: false,
+    likes: 0, likesInRound: 0, likePowerAdded: 0, finalTime: false,
     // BXH (lưu lại qua các màn/trận — chỉ xóa khi streamer bấm Xóa BXH):
     // giftTotals: userId → { nickname, power, coins, count, avatar }
     // likeTotals: userId → { nickname, likes, avatar }
@@ -598,18 +599,25 @@ export function applyLikes(state, userId, count, nickname = '', avatar = '') {
   state.likes += count || 0
   recordLike(state, userId, nickname || userId || 'Khán giả', count || 0, avatar)
   if (state.phase !== 'pulling') return 0
-  const every = state.settings.likeTimeEvery || 100
-  const per = state.settings.likeTimeSeconds || 10
-  const maxBonus = state.settings.likeTimeMaxBonus ?? 60
+  const every = state.settings.likePowerEvery || 100
+  const per = state.settings.likePower || 10
+  const maxBonus = state.settings.likePowerMax ?? 60
   state.likesInRound = (state.likesInRound || 0) + (count || 0)
   let added = 0
-  while (state.likesInRound >= every && state.timeAddedByLikes < maxBonus) {
+  while (state.likesInRound >= every && state.likePowerAdded < maxBonus) {
     state.likesInRound -= every
-    state.roundTimeLeft += per
-    state.timeAddedByLikes += per
+    state.likePowerAdded += per
     added++
-    pushFeed(state, 'like', `❤️ Đủ ${every} tim: +${per}s kéo co!`)
-    state.effects.push({ id: nextId('fx'), kind: 'time', team: null, t: 0, dur: 1.5 })
+    // Lực kéo về đội của người thả tim đó (đã vào đội thì về đội đó, chưa
+    // vào thì về đội đang thua / đội ít người — như quà tặng).
+    const teamId = giftTeam(state, userId, '')
+    const team = state.teams[teamId]
+    team.boost += per
+    team.pullRate = team.members.length + team.boost
+    team.totalPull += per
+    team.lastPullAt = state.now
+    pushFeed(state, 'like', `❤️ Đủ ${every} tim: +${per} lực kéo cho ${TEAMS[teamId].name}!`)
+    state.effects.push({ id: nextId('fx'), kind: 'like', team: teamId, power: per, t: 0, dur: 1.5 })
   }
   return added
 }
@@ -656,7 +664,7 @@ export function startRound(state) {
     state.teams[t].pullRate = state.teams[t].members.length
   }
   state.likesInRound = 0
-  state.timeAddedByLikes = 0
+  state.likePowerAdded = 0
   state.finalTime = false
   pushFeed(state, 'info', `🏁 Màn ${state.round} — chuẩn bị… 3 — 2 — 1!`)
 }

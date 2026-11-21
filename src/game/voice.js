@@ -35,7 +35,7 @@ export function voiceTextRoundWin(teamName, round) { return `${teamName} thắng
 export function voiceTextMatchWin(teamName) { return `${teamName} vô địch trận đấu!` }
 export function voiceTextRoundStart(round, labelA, labelB) { return `Màn ${round} bắt đầu! ${labelA} đấu với ${labelB}!` }
 export function voiceTextFinal() { return 'Giờ chót! Mười giây cuối, quà tặng nhân đôi!' }
-export function voiceTextLikes(seconds) { return `Đủ một trăm tim, cộng thêm ${seconds} giây!` }
+export function voiceTextLikes(power) { return `Đủ một trăm tim, cộng thêm ${power} lực kéo!` }
 export function voiceTextBxh(province, gifter) {
   const parts = []
   if (province) parts.push(`${province.name} dẫn đầu với ${Math.round(province.power)} lực`)
